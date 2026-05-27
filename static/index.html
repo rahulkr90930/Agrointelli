@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgroIntelli — AI Plant Disease Diagnostics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Background glow elements for premium look -->
+    <div class="glow-bg glow-1"></div>
+    <div class="glow-bg glow-2"></div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <i class="fa-solid fa-leaf leaf-logo"></i>
+                <div>
+                    <h1>AgroIntelli</h1>
+                    <p class="subtitle">Next-Gen Offline Plant Pathology AI</p>
+                </div>
+            </div>
+            <div class="mode-control">
+                <span class="mode-label">Lab Mode</span>
+                <label class="switch">
+                    <input type="checkbox" id="field-mode-toggle" checked>
+                    <span class="slider round"></span>
+                </label>
+                <span class="mode-label active">Field Mode</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- Left Panel: Upload and Controls -->
+            <section class="control-panel">
+                <div class="glass-card upload-card">
+                    <h2 class="section-title"><i class="fa-solid fa-cloud-arrow-up"></i> Upload Leaf Image</h2>
+                    <p class="section-desc">Supports JPEG, PNG, BMP, or WEBP. Max 10MB.</p>
+                    
+                    <div class="drag-drop-zone" id="drop-zone">
+                        <input type="file" id="file-input" accept="image/*" class="file-input-hidden">
+                        <div class="drop-zone-content" id="drop-content">
+                            <i class="fa-solid fa-images upload-icon"></i>
+                            <p class="upload-text">Drag & drop your leaf image here</p>
+                            <span class="or-text">or</span>
+                            <button type="button" class="btn-browse" id="btn-browse">Browse Files</button>
+                        </div>
+                        <div class="preview-container hidden" id="preview-container">
+                            <img id="image-preview" src="#" alt="Leaf Preview">
+                            <button type="button" class="btn-remove-image" id="btn-remove-image" title="Remove Image">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn-analyze disabled" id="btn-analyze" disabled>
+                        <span class="btn-text">Analyze Plant Leaf</span>
+                        <i class="fa-solid fa-microscope icon-analyze"></i>
+                        <span class="spinner hidden" id="btn-spinner"></span>
+                    </button>
+                </div>
+
+                <div class="glass-card info-card">
+                    <h3><i class="fa-solid fa-circle-info"></i> About AgroIntelli</h3>
+                    <p>AgroIntelli leverages a quantized <strong>MobileNetV3-Small</strong> deep learning model trained on over 38 distinct plant-disease classes. Designed for offline field deployment, it runs fast, lightweight, and fully client-safe.</p>
+                    <div class="spec-list">
+                        <div class="spec-item"><span class="spec-name">Model Size</span><span class="spec-val">1.2 MB (TFLite)</span></div>
+                        <div class="spec-item"><span class="spec-name">Precision</span><span class="spec-val">INT8 Quantized</span></div>
+                        <div class="spec-item"><span class="spec-name">Target Size</span><span class="spec-val">160 × 160 px</span></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Results Dashboard -->
+            <section class="results-panel">
+                <!-- Welcome/Empty State -->
+                <div class="glass-card empty-state" id="empty-state">
+                    <div class="empty-content">
+                        <div class="pulse-ring">
+                            <i class="fa-solid fa-seedling seedling-icon"></i>
+                        </div>
+                        <h2>Awaiting Diagnostics</h2>
+                        <p>Upload a leaf image on the left and click <strong>Analyze Plant Leaf</strong> to run deep neural inference, quality checks, and severity analysis.</p>
+                    </div>
+                </div>
+
+                <!-- Skeleton Loader -->
+                <div class="glass-card skeleton-state hidden" id="skeleton-state">
+                    <div class="skeleton-header">
+                        <div class="skeleton-line title"></div>
+                        <div class="skeleton-line subtitle"></div>
+                    </div>
+                    <div class="skeleton-grid">
+                        <div class="skeleton-block"></div>
+                        <div class="skeleton-block"></div>
+                        <div class="skeleton-block long"></div>
+                    </div>
+                </div>
+
+                <!-- Real Results Dashboard -->
+                <div class="dashboard-grid hidden" id="dashboard-results">
+                    <!-- Primary Diagnosis Card -->
+                    <div class="glass-card diagnosis-card span-2">
+                        <div class="diag-header">
+                            <div>
+                                <span class="badge" id="confidence-badge">High Confidence</span>
+                                <h2 id="predicted-disease">Tomato Early Blight</h2>
+                                <p class="scientific-name" id="scientific-name">Solanum lycopersicum — Alternaria solani</p>
+                            </div>
+                            <div class="score-circle">
+                                <span class="score-number" id="confidence-percentage">98.4%</span>
+                                <span class="score-label">Match</span>
+                            </div>
+                        </div>
+                        <hr class="card-divider">
+                        <!-- Top Alternates (Top 3) -->
+                        <div class="alternates-section">
+                            <h3>Alternative Diagnoses</h3>
+                            <div class="alternates-list" id="alternates-list">
+                                <!-- JS populated -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Severity Proxy Card -->
+                    <div class="glass-card severity-card">
+                        <h3><i class="fa-solid fa-triangle-exclamation"></i> Severity Analysis</h3>
+                        <div class="severity-visual">
+                            <div class="progress-radial-container">
+                                <svg class="radial-svg" viewBox="0 0 100 100">
+                                    <circle class="radial-track" cx="50" cy="50" r="42"></circle>
+                                    <circle class="radial-progress" id="severity-radial" cx="50" cy="50" r="42" stroke-dasharray="263.89" stroke-dashoffset="263.89"></circle>
+                                </svg>
+                                <div class="radial-content">
+                                    <span class="radial-value" id="lesion-percentage">12.5%</span>
+                                    <span class="radial-label">Lesion Ratio</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="severity-details">
+                            <p class="severity-desc">Estimated visual crop damage: <strong id="severity-level">Early/Moderate</strong></p>
+                        </div>
+                    </div>
+
+                    <!-- Image Quality Check Card -->
+                    <div class="glass-card quality-card">
+                        <h3><i class="fa-solid fa-circle-check"></i> Capture Quality</h3>
+                        <div class="quality-status" id="quality-status-badge">
+                            <i class="fa-solid fa-circle-check text-success"></i> Good Capture
+                        </div>
+                        <div class="metrics-list">
+                            <div class="metric-row">
+                                <span class="metric-name"><i class="fa-solid fa-sun"></i> Brightness</span>
+                                <div class="metric-bar-container">
+                                    <div class="metric-bar" id="bar-brightness" style="width: 60%"></div>
+                                </div>
+                                <span class="metric-val" id="val-brightness">120</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-name"><i class="fa-solid fa-circle-half-stroke"></i> Contrast</span>
+                                <div class="metric-bar-container">
+                                    <div class="metric-bar" id="bar-contrast" style="width: 45%"></div>
+                                </div>
+                                <span class="metric-val" id="val-contrast">45</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-name"><i class="fa-solid fa-wand-magic-sparkles"></i> Sharpness</span>
+                                <div class="metric-bar-container">
+                                    <div class="metric-bar" id="bar-sharpness" style="width: 80%"></div>
+                                </div>
+                                <span class="metric-val" id="val-sharpness">24.5</span>
+                            </div>
+                        </div>
+                        <div class="quality-warnings hidden" id="quality-warnings-box">
+                            <!-- Warnings listed here -->
+                        </div>
+                    </div>
+
+                    <!-- Care Advice Card -->
+                    <div class="glass-card advice-card span-2">
+                        <h3><i class="fa-solid fa-prescription-bottle-medical"></i> Treatment & Agronomy Care Advice</h3>
+                        <div class="advice-content">
+                            <p id="advice-text">Apply copper-based fungicides early in the morning or late evening. Ensure adequate plant spacing to allow ventilation and reduce humidity around the tomato leaves.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <p>&copy; 2026 AgroIntelli Diagnostics. Designed for local, robust, and accessible smart farming.</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

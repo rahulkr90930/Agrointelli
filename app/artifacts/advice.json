@@ -1,0 +1,158 @@
+{
+  "Apple___Apple_scab": {
+    "summary": "Use sanitation and monitor leaf surfaces.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Apple___Black_rot": {
+    "summary": "No specific advice found. Continue monitoring and compare with crop guidance.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Apple___Cedar_apple_rust": {
+    "summary": "Improve airflow and monitor spread carefully.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Apple___healthy": {
+    "summary": "No obvious disease detected. Keep monitoring regularly.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Background_without_leaves": {
+    "summary": "No specific advice found. Continue monitoring and compare with crop guidance.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Blueberry___healthy": {
+    "summary": "No obvious disease detected. Keep monitoring regularly.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Cherry___Powdery_mildew": {
+    "summary": "No specific advice found. Continue monitoring and compare with crop guidance.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Cherry___healthy": {
+    "summary": "No obvious disease detected. Keep monitoring regularly.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Corn___Cercospora_leaf_spot Gray_leaf_spot": {
+    "summary": "Reduce leaf wetness and remove affected leaves.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Corn___Common_rust": {
+    "summary": "Improve airflow and monitor spread carefully.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Corn___Northern_Leaf_Blight": {
+    "summary": "Remove infected leaves and avoid overhead watering.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Corn___healthy": {
+    "summary": "No obvious disease detected. Keep monitoring regularly.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Grape___Black_rot": {
+    "summary": "No specific advice found. Continue monitoring and compare with crop guidance.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Grape___Esca_(Black_Measles)": {
+    "summary": "No specific advice found. Continue monitoring and compare with crop guidance.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)": {
+    "summary": "Remove infected leaves and avoid overhead watering.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Grape___healthy": {
+    "summary": "No obvious disease detected. Keep monitoring regularly.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Orange___Haunglongbing_(Citrus_greening)": {
+    "summary": "No specific advice found. Continue monitoring and compare with crop guidance.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Peach___Bacterial_spot": {
+    "summary": "Reduce leaf wetness and remove affected leaves.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Peach___healthy": {
+    "summary": "No obvious disease detected. Keep monitoring regularly.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Pepper,_bell___Bacterial_spot": {
+    "summary": "Reduce leaf wetness and remove affected leaves.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Pepper,_bell___healthy": {
+    "summary": "No obvious disease detected. Keep monitoring regularly.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Potato___Early_blight": {
+    "summary": "Remove infected leaves and avoid overhead watering.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Potato___Late_blight": {
+    "summary": "Remove infected leaves and avoid overhead watering.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Potato___healthy": {
+    "summary": "No obvious disease detected. Keep monitoring regularly.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Raspberry___healthy": {
+    "summary": "No obvious disease detected. Keep monitoring regularly.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Soybean___healthy": {
+    "summary": "No obvious disease detected. Keep monitoring regularly.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Squash___Powdery_mildew": {
+    "summary": "No specific advice found. Continue monitoring and compare with crop guidance.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Strawberry___Leaf_scorch": {
+    "summary": "No specific advice found. Continue monitoring and compare with crop guidance.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Strawberry___healthy": {
+    "summary": "No obvious disease detected. Keep monitoring regularly.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Tomato___Bacterial_spot": {
+    "summary": "Reduce leaf wetness and remove affected leaves.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Tomato___Early_blight": {
+    "summary": "Remove infected leaves and avoid overhead watering.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Tomato___Late_blight": {
+    "summary": "Remove infected leaves and avoid overhead watering.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Tomato___Leaf_Mold": {
+    "summary": "No specific advice found. Continue monitoring and compare with crop guidance.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Tomato___Septoria_leaf_spot": {
+    "summary": "Reduce leaf wetness and remove affected leaves.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Tomato___Spider_mites Two-spotted_spider_mite": {
+    "summary": "Reduce leaf wetness and remove affected leaves.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Tomato___Target_Spot": {
+    "summary": "Reduce leaf wetness and remove affected leaves.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Tomato___Tomato_Yellow_Leaf_Curl_Virus": {
+    "summary": "No specific advice found. Continue monitoring and compare with crop guidance.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Tomato___Tomato_mosaic_virus": {
+    "summary": "Control vectors and remove infected plants if needed.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  },
+  "Tomato___healthy": {
+    "summary": "No obvious disease detected. Keep monitoring regularly.",
+    "prevention": "Keep the plant dry, monitor regularly, and remove infected tissue if needed."
+  }
+}

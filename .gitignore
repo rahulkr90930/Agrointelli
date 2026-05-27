@@ -1,0 +1,42 @@
+# Virtual Environment
+venv311/
+venv/
+ENV/
+.env
+
+# Python Cache & Compiled Files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# IDE / System Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# OS / Temporary files
+tmp/
+temp/
+scratch/
+*.zip
+*.tar.gz
+*.rar
+
+# Model weights and checkpoint logs (keep app/artifacts metadata, ignore large training caches)
+notebooks/AgroIntelli_Standalone/outputs/
+notebooks/AgroIntelli_Standalone/artifacts/
+outputs/
+data/
+*.keras
+*.h5
+*.tflite
+!app/artifacts/agrointelli_quant.tflite
+!app/artifacts/labels.txt
+!app/artifacts/advice.json
+!app/artifacts/class_names.json

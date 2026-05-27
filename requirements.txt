@@ -1,0 +1,13 @@
+# ---- Notebook training (desktop/Colab) ----
+tensorflow>=2.15
+scikit-learn
+pandas
+matplotlib
+pillow
+opencv-python
+numpy
+
+# ---- Web Server ----
+fastapi
+uvicorn
+python-multipart
