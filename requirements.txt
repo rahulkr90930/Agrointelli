@@ -2,6 +2,7 @@
 flask>=3.0,<4
 flask-cors>=4.0,<5
 requests>=2.31,<3
+pymongo>=4.0
 
 # ML / data stack
 tensorflow>=2.16,<2.20

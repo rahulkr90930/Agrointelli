@@ -462,6 +462,146 @@
     .bar-track { background:rgba(0,0,0,0.03); border-radius:10px; height:10px; overflow:hidden; }
     .bar-fill { height:100%; border-radius:10px; width:0; background:linear-gradient(90deg,var(--teal),var(--green)); transition:width 0.85s cubic-bezier(0.4,0,0.2,1); }
 
+    /* Grad-CAM Card & Damage Meter */
+    .gc-card {
+      background: var(--surface2);
+      border: 1px solid rgba(16,185,129,0.14);
+      border-radius: var(--r-md);
+      padding: 1.15rem;
+      display: grid;
+      grid-template-columns: 210px 1fr;
+      gap: 1.25rem;
+      align-items: center;
+    }
+    @media(max-width: 640px) {
+      .gc-card { grid-template-columns: 1fr; }
+    }
+    .gc-img-wrap {
+      position: relative;
+      border-radius: var(--r-sm);
+      overflow: hidden;
+      border: 1px solid rgba(0,0,0,0.08);
+      background: #000;
+      aspect-ratio: 1;
+      max-height: 210px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .gc-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: opacity 0.2s ease;
+    }
+    .gc-img-badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background: rgba(0,0,0,0.65);
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 12px;
+      backdrop-filter: blur(4px);
+      pointer-events: none;
+    }
+    .gc-toggle-btn {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      background: rgba(255,255,255,0.92);
+      color: var(--green-xdark);
+      border: 1px solid rgba(0,0,0,0.1);
+      font-size: 0.66rem;
+      font-weight: 700;
+      padding: 0.25rem 0.55rem;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: var(--sh-xs);
+      transition: var(--ease);
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .gc-toggle-btn:hover {
+      background: #fff;
+      transform: scale(1.03);
+    }
+    .gc-details {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .gc-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .gc-metric {
+      display: flex;
+      flex-direction: column;
+    }
+    .gc-metric-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-3);
+      font-weight: 700;
+    }
+    .gc-metric-val {
+      font-size: 1.85rem;
+      font-weight: 800;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      line-height: 1.1;
+      margin-top: 2px;
+      color: var(--green-xdark);
+    }
+    .gc-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.22rem 0.65rem;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .gc-badge-mild     { background: rgba(16,185,129,0.1); color: #047857; border: 1px solid rgba(16,185,129,0.2); }
+    .gc-badge-moderate { background: rgba(217,119,6,0.1);  color: #b45309; border: 1px solid rgba(217,119,6,0.2); }
+    .gc-badge-severe   { background: rgba(220,38,38,0.1);  color: #dc2626; border: 1px solid rgba(220,38,38,0.2); }
+    .gc-badge-healthy  { background: rgba(16,185,129,0.1); color: #047857; border: 1px solid rgba(16,185,129,0.2); }
+
+    .gc-bar-track {
+      background: rgba(0,0,0,0.06);
+      border-radius: 10px;
+      height: 8px;
+      overflow: hidden;
+      width: 100%;
+    }
+    .gc-bar-fill {
+      height: 100%;
+      border-radius: 10px;
+      width: 0%;
+      transition: width 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .gc-legend {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.64rem;
+      color: var(--text-4);
+      margin-top: 2px;
+    }
+    .gc-legend-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000);
+      margin: 4px 0 2px;
+    }
+
     /* Diagnostics grid */
     .info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:0.7rem; }
     .info-box { background:var(--surface2); border:1px solid rgba(0,0,0,0.04); border-radius:var(--r-md); padding:0.85rem 1rem; }
@@ -548,6 +688,121 @@
     /* Footer */
     footer { text-align:center; padding:2rem 1.5rem; color:var(--text-4); font-size:0.73rem; border-top:1px solid rgba(16,185,129,0.08); background:rgba(255,255,255,0.4); }
 
+    /* Journal & Auth Elements */
+    .journal-hero-card {
+      background: linear-gradient(135deg, rgba(16,185,129,0.08), rgba(6,182,212,0.05));
+      border: 1px solid rgba(16,185,129,0.22);
+      border-radius: var(--r-md);
+      padding: 1rem 1.4rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .jhc-content { display:flex; align-items:center; gap:0.9rem; }
+    .jhc-icon { font-size: 1.8rem; }
+    .jhc-title { font-weight: 700; color: var(--green-xdark); font-size: 0.95rem; }
+    .jhc-sub { font-size: 0.8rem; color: var(--text-2); margin-top: 2px; }
+
+    .header-journal-btn {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      padding: 0.4rem 0.9rem; border-radius: 20px;
+      font-size: 0.76rem; font-weight: 700; cursor: pointer;
+      background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25);
+      color: var(--green-xdark); transition: var(--ease);
+    }
+    .header-journal-btn:hover { background: rgba(16,185,129,0.18); transform: translateY(-1px); }
+    .header-journal-btn .badge {
+      background: var(--green); color: #fff; border-radius: 10px;
+      padding: 0.1rem 0.45rem; font-size: 0.65rem; font-weight: 800;
+    }
+
+    .user-pill {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      padding: 0.35rem 0.75rem; border-radius: 20px;
+      font-size: 0.74rem; font-weight: 600; background: #ffffff;
+      border: 1px solid rgba(16,185,129,0.2); color: var(--text-2);
+      box-shadow: var(--sh-xs);
+    }
+    .auth-link-btn {
+      color: var(--green); font-weight: 700; cursor: pointer; border: none; background: none; padding: 0;
+      font-size: 0.74rem; text-decoration: underline; margin-left: 2px;
+    }
+
+    /* Modal System */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center;
+      z-index: 9999; padding: 1.25rem;
+    }
+    .modal-dialog {
+      background: #ffffff; border-radius: var(--r-lg); width: 100%; max-width: 600px;
+      box-shadow: var(--sh-lg); border: 1px solid var(--border);
+      max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column;
+      animation: slideUp 0.22s ease;
+    }
+    .modal-head {
+      padding: 1.15rem 1.4rem; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--surface2);
+    }
+    .modal-head h3 { font-size: 1.05rem; font-weight: 700; color: var(--green-xdark); display:flex; align-items:center; gap:0.5rem; margin:0; }
+    .modal-close {
+      background: rgba(0,0,0,0.06); border: none; border-radius: 50%;
+      width: 28px; height: 28px; font-size: 0.8rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: var(--ease);
+    }
+    .modal-close:hover { background: var(--red); color: #fff; }
+    .modal-body { padding: 1.35rem 1.4rem; display: flex; flex-direction: column; gap: 1rem; }
+
+    /* Auth tabs & forms */
+    .auth-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 0.5rem; }
+    .auth-tab {
+      flex: 1; padding: 0.65rem; text-align: center; font-size: 0.82rem; font-weight: 700;
+      cursor: pointer; color: var(--text-3); border-bottom: 2px solid transparent;
+    }
+    .auth-tab.active { color: var(--green); border-bottom-color: var(--green); }
+    .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+    .form-group label { font-size: 0.72rem; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; }
+    .form-control {
+      padding: 0.65rem 0.85rem; border: 1px solid var(--border); border-radius: var(--r-sm);
+      font-size: 0.88rem; outline: none; transition: var(--ease);
+    }
+    .form-control:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(16,185,129,0.12); }
+
+    /* Plant Journal List */
+    .journal-list { display: flex; flex-direction: column; gap: 0.85rem; max-height: 420px; overflow-y: auto; }
+    .journal-card {
+      background: var(--surface2); border: 1px solid rgba(16,185,129,0.14);
+      border-radius: var(--r-md); padding: 1rem 1.15rem; display: flex; flex-direction: column;
+      gap: 0.65rem; transition: var(--ease);
+    }
+    .journal-card:hover { border-color: var(--green); box-shadow: var(--sh-xs); }
+    .jc-head { display: flex; justify-content: space-between; align-items: flex-start; }
+    .jc-title { font-weight: 700; font-size: 0.94rem; color: var(--green-xdark); }
+    .jc-dates { font-size: 0.72rem; color: var(--text-3); }
+    .jc-body { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; font-size: 0.8rem; }
+    .jc-pill { padding: 0.2rem 0.55rem; border-radius: 12px; font-weight: 700; font-size: 0.72rem; }
+    .jc-actions { display: flex; align-items: center; gap: 0.5rem; }
+
+    /* Comparison Box for Re-checking */
+    .compare-container {
+      background: #ffffff; border: 1px solid rgba(16,185,129,0.2);
+      border-radius: var(--r-md); padding: 1.15rem; margin-top: 0.5rem;
+    }
+    .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .compare-col {
+      background: var(--surface2); padding: 0.85rem; border-radius: var(--r-sm);
+      border: 1px solid rgba(0,0,0,0.05); text-align: center;
+    }
+    .compare-col h5 { font-size: 0.74rem; text-transform: uppercase; color: var(--text-3); margin-bottom: 0.4rem; letter-spacing:0.04em; }
+    .compare-verdict-banner {
+      margin-top: 0.85rem; padding: 0.8rem 1rem; border-radius: var(--r-sm);
+      display: flex; align-items: center; gap: 0.75rem; font-size: 0.84rem;
+    }
+
     /* Responsive tweaks */
     @media(max-width:640px){
       header { padding:0.75rem 1.1rem; }
@@ -568,6 +823,14 @@
     </div>
   </div>
   <div class="header-right">
+    <button class="header-journal-btn" id="btn-header-journal" title="Open Leaf Health Journal">
+      <span>📂 Check on Past Disease</span>
+      <span class="badge" id="header-records-count">0</span>
+    </button>
+    <div class="user-pill" id="user-badge-wrap">
+      <span id="user-pill-label">👤 Guest Mode</span>
+      <button class="auth-link-btn" id="btn-open-auth">Sign In</button>
+    </div>
     <div class="status-pill" id="status-pill">
       <span class="dot"></span>
       <span id="status-text">Checking…</span>
@@ -576,6 +839,20 @@
 </header>
 
 <div class="page">
+
+  <!-- ══════════════ LANDING PAGE JOURNAL ACTION CARD ══════════════ -->
+  <div class="journal-hero-card" id="journal-hero-banner">
+    <div class="jhc-content">
+      <div class="jhc-icon">🌱</div>
+      <div>
+        <div class="jhc-title">Leaf Health History &amp; Disease Re-Check Journal</div>
+        <div class="jhc-sub">Inspect past leaf scans across Day 1, Day 7, Day 14… Re-scan the same leaf to evaluate whether infection has improved, worsened, or shifted.</div>
+      </div>
+    </div>
+    <button class="header-journal-btn" id="btn-hero-journal" style="background:#ffffff;border-color:var(--green);padding:0.5rem 1.1rem;font-size:0.82rem;">
+      📂 Check on Past Disease
+    </button>
+  </div>
 
   <!-- ══════════════ TOP ROW: Upload + Controls ══════════════ -->
   <div class="top-row">
@@ -806,6 +1083,9 @@
           <div>
             <div class="hb-tag">Primary Diagnosis</div>
             <div class="hb-name" id="res-disease">—</div>
+            <button type="button" class="header-journal-btn" id="btn-save-current-scan" style="margin-top:0.75rem;background:#fff;border-color:var(--green);font-size:0.75rem;">
+              💾 Save Leaf to Journal (Track Day 1 ➔ Day 7)
+            </button>
           </div>
           <div class="gauge-wrap">
             <svg class="g-svg" width="82" height="82">
@@ -820,6 +1100,40 @@
         <div>
           <div class="sec-head">📋 Classifier Distribution</div>
           <div class="bar-list" id="top3-bars"></div>
+        </div>
+
+        <!-- Grad-CAM Visual Attention & Leaf Damage -->
+        <div id="gradcam-section" style="display:none;">
+          <div class="sec-head">🎯 Visual Attention &amp; Leaf Damage (Grad-CAM)</div>
+          <div class="gc-card">
+            <div class="gc-img-wrap">
+              <img id="gc-display-img" class="gc-img" src="" alt="Grad-CAM Visualization" />
+              <div class="gc-img-badge" id="gc-img-tag">Grad-CAM Overlay</div>
+              <button type="button" class="gc-toggle-btn" id="gc-toggle-btn" title="Toggle between heatmap and original photo">
+                <span>🔄 Toggle View</span>
+              </button>
+            </div>
+            <div class="gc-details">
+              <div class="gc-top">
+                <div class="gc-metric">
+                  <span class="gc-metric-label">Leaf Surface Affected</span>
+                  <span class="gc-metric-val" id="gc-affected-pct">—</span>
+                </div>
+                <span class="gc-badge gc-badge-mild" id="gc-badge">—</span>
+              </div>
+              <div class="gc-bar-track">
+                <div class="gc-bar-fill" id="gc-bar-fill"></div>
+              </div>
+              <p id="gc-desc" style="font-size:0.8rem;color:var(--text-2);line-height:1.5;margin:2px 0 0;"></p>
+              <div>
+                <div class="gc-legend-bar"></div>
+                <div class="gc-legend">
+                  <span>Healthy / Low Attention</span>
+                  <span>Pathogen Focus (Active Lesion)</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Acquisition diagnostics -->
@@ -887,13 +1201,225 @@
           </div>
         </div>
 
+        <!-- Save Analysis to MongoDB Section -->
+        <div id="save-analysis-section" style="margin-top:0.5rem;">
+          <div class="sec-head">💾 Save to MongoDB &amp; Health Journal</div>
+          <div class="journal-card" style="background:linear-gradient(145deg, rgba(16,185,129,0.06), rgba(6,182,212,0.04));border:1.5px solid rgba(16,185,129,0.28);padding:1.25rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
+              <div style="display:flex;align-items:center;gap:0.75rem;">
+                <div style="font-size:1.8rem;">🍃</div>
+                <div>
+                  <h4 style="margin:0;font-size:1rem;color:var(--green-xdark);font-weight:700;">Save Findings to MongoDB Cloud</h4>
+                  <p style="margin:2px 0 0;font-size:0.78rem;color:var(--text-2);">
+                    Store this leaf diagnosis, Grad-CAM severity score, and weather snapshot in MongoDB to track Day 1 vs Day 7 progression.
+                  </p>
+                </div>
+              </div>
+              <span id="save-db-badge" class="jc-pill" style="background:rgba(16,185,129,0.12);color:var(--green-dark);">
+                🍃 MongoDB Active
+              </span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;margin-top:1rem;">
+              <div class="form-group">
+                <label>Plant / Crop Nickname</label>
+                <input type="text" class="form-control" id="bottom-save-plant-name" placeholder="e.g. Tomato Plot #1 - Leaf A" />
+              </div>
+              <div class="form-group">
+                <label>Timeline Stage</label>
+                <input type="text" class="form-control" id="bottom-save-day-label" value="Day 1" placeholder="e.g. Day 1, Day 7" />
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top:0.75rem;">
+              <label>Agronomic Field Notes (Optional)</label>
+              <input type="text" class="form-control" id="bottom-save-notes" placeholder="e.g. Discovered early yellow spots; sprayed sulfur solution" />
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-top:1.15rem;flex-wrap:wrap;">
+              <button type="button" class="btn btn-green" id="btn-save-bottom" style="padding:0.75rem 1.6rem;font-size:0.9rem;font-weight:700;">
+                <span id="btn-save-bottom-text">💾 Save to MongoDB</span>
+              </button>
+              <button type="button" class="header-journal-btn" id="btn-open-from-bottom" style="background:#fff;padding:0.6rem 1.1rem;">
+                📂 View in Check on Past Disease
+              </button>
+            </div>
+
+            <div id="save-bottom-status" style="display:none;margin-top:0.9rem;padding:0.85rem 1rem;border-radius:var(--r-sm);font-size:0.84rem;font-weight:600;"></div>
+          </div>
+        </div>
+
       </div>
     </div>
 
     <div id="error-panel" style="display:none;"></div>
   </div>
 
-</div><!-- .page -->
+<!-- ══════════════ MODALS ══════════════ -->
+
+<!-- 1. Auth Modal -->
+<div class="modal-backdrop" id="modal-auth">
+  <div class="modal-dialog">
+    <div class="modal-head">
+      <h3>🌱 AgroIntelli Account</h3>
+      <button class="modal-close" onclick="closeAuthModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="auth-tabs">
+        <div class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Sign In</div>
+        <div class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">Create Account</div>
+        <div class="auth-tab" id="tab-guest" onclick="switchAuthTab('guest')">Guest Mode</div>
+      </div>
+
+      <div id="auth-err" style="display:none;padding:0.6rem 0.8rem;border-radius:6px;background:rgba(220,38,38,0.08);color:#dc2626;font-size:0.78rem;"></div>
+
+      <!-- Login Form -->
+      <form id="form-login" onsubmit="handleLogin(event)">
+        <div class="form-group" style="margin-bottom:0.75rem;">
+          <label>Username or Email</label>
+          <input type="text" class="form-control" id="login-id" required placeholder="e.g. rahul_farmer" />
+        </div>
+        <div class="form-group" style="margin-bottom:1.1rem;">
+          <label>Password</label>
+          <input type="password" class="form-control" id="login-pwd" required placeholder="••••••••" />
+        </div>
+        <button type="submit" class="btn btn-green" style="width:100%;">Sign In</button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="form-register" style="display:none;" onsubmit="handleRegister(event)">
+        <div class="form-group" style="margin-bottom:0.75rem;">
+          <label>Desired Username</label>
+          <input type="text" class="form-control" id="reg-username" required placeholder="e.g. rahul_farmer" />
+        </div>
+        <div class="form-group" style="margin-bottom:0.75rem;">
+          <label>Email (Optional)</label>
+          <input type="email" class="form-control" id="reg-email" placeholder="farmer@example.com" />
+        </div>
+        <div class="form-group" style="margin-bottom:1.1rem;">
+          <label>Password</label>
+          <input type="password" class="form-control" id="reg-pwd" required placeholder="At least 4 characters" />
+        </div>
+        <button type="submit" class="btn btn-green" style="width:100%;">Create Account &amp; Sync</button>
+      </form>
+
+      <!-- Guest Panel -->
+      <div id="panel-guest" style="display:none;text-align:center;padding:1rem 0.5rem;">
+        <div style="font-size:2rem;margin-bottom:0.4rem;">🌾</div>
+        <h4 style="font-size:0.95rem;color:var(--green-xdark);margin-bottom:0.3rem;">Continue as Guest</h4>
+        <p style="font-size:0.8rem;color:var(--text-3);line-height:1.5;margin-bottom:1.1rem;">
+          You can diagnose crops and save temporary leaf records immediately without creating an account or logging in.
+        </p>
+        <button type="button" class="btn btn-teal" style="width:100%;" onclick="continueAsGuest()">Use Guest Mode</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. Journal Modal (Past Disease Records) -->
+<div class="modal-backdrop" id="modal-journal">
+  <div class="modal-dialog" style="max-width:700px;">
+    <div class="modal-head">
+      <h3>📂 Leaf Health Journal &amp; Past Disease Records</h3>
+      <button class="modal-close" onclick="closeJournalModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+        <span id="journal-user-tag" style="font-size:0.8rem;font-weight:700;color:var(--text-2);">👤 Loading records…</span>
+        <span id="journal-storage-pill" class="jc-pill" style="background:rgba(16,185,129,0.1);color:var(--green-dark);">🍃 MongoDB Active</span>
+      </div>
+
+      <div id="journal-list-container" class="journal-list">
+        <div style="text-align:center;padding:2rem;color:var(--text-3);font-size:0.85rem;">
+          Loading tracked leaf records from database…
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. Re-check Leaf Modal -->
+<div class="modal-backdrop" id="modal-recheck">
+  <div class="modal-dialog" style="max-width:680px;">
+    <div class="modal-head">
+      <h3>📸 Re-check Tracked Leaf (Day X)</h3>
+      <button class="modal-close" onclick="closeRecheckModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="recheck-baseline-summary" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.85rem 1rem;font-size:0.82rem;"></div>
+
+      <form id="form-recheck" onsubmit="submitRecheck(event)">
+        <div class="form-group" style="margin-bottom:0.75rem;">
+          <label>Today's Leaf Photo (Upload or Capture)</label>
+          <input type="file" id="recheck-file-input" class="form-control" accept="image/*" required />
+        </div>
+        <div class="form-group" style="margin-bottom:0.75rem;">
+          <label>Timeline Stage Label</label>
+          <input type="text" id="recheck-day-label" class="form-control" placeholder="e.g. Day 7, Day 14, Follow-up #2" value="Day 7" required />
+        </div>
+        <div class="form-group" style="margin-bottom:1.1rem;">
+          <label>Field Notes / Treatments Applied</label>
+          <input type="text" id="recheck-notes" class="form-control" placeholder="e.g. Sprayed organic copper fungicide on Day 3" />
+        </div>
+        <button type="submit" class="btn btn-green" id="btn-submit-recheck" style="width:100%;">
+          <div class="spinner" id="recheck-spinner" style="display:none;"></div>
+          <span id="recheck-btn-text">🔬 Run Comparative Analysis</span>
+        </button>
+      </form>
+
+      <div id="recheck-result-wrap" style="display:none;">
+        <div class="compare-container">
+          <h4 style="font-size:0.9rem;color:var(--green-xdark);margin-bottom:0.6rem;">📊 Progression Comparison (Baseline vs Today)</h4>
+          <div class="compare-grid">
+            <div class="compare-col" id="col-baseline">
+              <h5>Baseline Scan</h5>
+              <div style="font-weight:700;color:var(--text-1);" id="comp-base-pred">—</div>
+              <div style="font-size:1.3rem;font-weight:800;color:var(--amber);margin-top:2px;" id="comp-base-pct">—</div>
+            </div>
+            <div class="compare-col" id="col-current">
+              <h5>Current Scan</h5>
+              <div style="font-weight:700;color:var(--text-1);" id="comp-curr-pred">—</div>
+              <div style="font-size:1.3rem;font-weight:800;color:var(--green);margin-top:2px;" id="comp-curr-pct">—</div>
+            </div>
+          </div>
+          <div id="compare-verdict-box" class="compare-verdict-banner"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 4. Save Leaf Record Modal -->
+<div class="modal-backdrop" id="modal-save-leaf">
+  <div class="modal-dialog" style="max-width:500px;">
+    <div class="modal-head">
+      <h3>💾 Save Leaf Health Record</h3>
+      <button class="modal-close" onclick="closeSaveModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.8rem;color:var(--text-3);line-height:1.5;">
+        Save this leaf to your health journal. When you return on Day 7 or Day 14, re-check this exact leaf to evaluate if lesions have reduced or spread.
+      </p>
+      <form id="form-save-leaf" onsubmit="submitSaveLeaf(event)">
+        <div class="form-group" style="margin-bottom:0.75rem;">
+          <label>Plant / Leaf Identifier</label>
+          <input type="text" id="save-plant-name" class="form-control" placeholder="e.g. Tomato Row 3 - Leaf A" required />
+        </div>
+        <div class="form-group" style="margin-bottom:0.75rem;">
+          <label>Current Timeline Day</label>
+          <input type="text" id="save-day-label" class="form-control" value="Day 1" required />
+        </div>
+        <div class="form-group" style="margin-bottom:1.1rem;">
+          <label>Agronomic Notes</label>
+          <input type="text" id="save-notes" class="form-control" placeholder="e.g. Initial symptom discovered; applying sulfur dust." />
+        </div>
+        <button type="submit" class="btn btn-green" id="btn-submit-save" style="width:100%;">
+          💾 Commit Record to Database
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
 
 <footer>AgroIntelli &mdash; Powered by EfficientNetB0 · Dual-Input Weather Engine · PlantVillage + PlantDoc datasets</footer>
 
@@ -926,7 +1452,18 @@
 
   /* ── State ───────────────────────────────────────────────── */
   let selectedFile = null;
+  let lastScanResult = null;
   const batchFiles = [null, null, null];
+
+  // User & Journal State
+  let currentUser = null;
+  try {
+    const saved = localStorage.getItem('agro_user');
+    if (saved) currentUser = JSON.parse(saved);
+  } catch (e) { currentUser = null; }
+
+  let userRecordsCache = [];
+  let activeRecheckRecord = null;
 
   /* ── Single upload zone ──────────────────────────────────── */
   const zone      = document.getElementById('upload-zone');
@@ -1127,11 +1664,18 @@
 
   /* ── Render Single Results ───────────────────────────────── */
   function renderResults(d) {
+    lastScanResult = d;
     $show('results-view'); $hide('placeholder-view');
     document.getElementById('batch-prog-wrap').style.display = 'none';
 
     const title = d.prediction.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
     document.getElementById('res-disease').textContent = title;
+
+    // Pre-populate bottom save card for quick 1-click MongoDB storage
+    const bottomNameEl = document.getElementById('bottom-save-plant-name');
+    if (bottomNameEl) bottomNameEl.value = `${title} - Leaf Sample`;
+    const bottomStatusEl = document.getElementById('save-bottom-status');
+    if (bottomStatusEl) bottomStatusEl.style.display = 'none';
 
     const pct = d.confidence_pct;
     document.getElementById('res-conf').textContent = pct.toFixed(1)+'%';
@@ -1149,6 +1693,64 @@
         <div class="bar-track"><div class="bar-fill" style="width:${p}%"></div></div>
       </div>`;
     });
+
+    // Grad-CAM Visualization & Affected Percentage
+    const gc = d.gradcam;
+    const gcSec = document.getElementById('gradcam-section');
+    if (gc && (gc.image || gc.affected_pct != null)) {
+      gcSec.style.display = 'block';
+      const dispImg = document.getElementById('gc-display-img');
+      const tag = document.getElementById('gc-img-tag');
+      const toggleBtn = document.getElementById('gc-toggle-btn');
+      const origUrl = selectedFile ? URL.createObjectURL(selectedFile) : null;
+      let showingHeatmap = true;
+
+      dispImg.src = gc.image || origUrl;
+      tag.textContent = 'Grad-CAM Overlay';
+
+      toggleBtn.onclick = () => {
+        if (!origUrl || !gc.image) return;
+        showingHeatmap = !showingHeatmap;
+        dispImg.src = showingHeatmap ? gc.image : origUrl;
+        tag.textContent = showingHeatmap ? 'Grad-CAM Overlay' : 'Original Photo';
+        toggleBtn.innerHTML = showingHeatmap ? '<span>🔄 Toggle View</span>' : '<span>🎯 View Heatmap</span>';
+      };
+
+      const affPct = Number(gc.affected_pct || 0);
+      const pctEl = document.getElementById('gc-affected-pct');
+      pctEl.textContent = affPct.toFixed(1) + '%';
+
+      const badgeEl = document.getElementById('gc-badge');
+      const fillEl  = document.getElementById('gc-bar-fill');
+      fillEl.style.width = Math.min(affPct, 100) + '%';
+
+      if (gc.is_healthy || affPct < 1.0) {
+        pctEl.style.color = 'var(--green)';
+        fillEl.style.background = 'var(--green)';
+        badgeEl.className = 'gc-badge gc-badge-healthy';
+        badgeEl.textContent = 'Healthy Tissue';
+      } else if (affPct < 10.0) {
+        pctEl.style.color = 'var(--green-dark)';
+        fillEl.style.background = 'var(--green)';
+        badgeEl.className = 'gc-badge gc-badge-mild';
+        badgeEl.textContent = 'Mild Surface Damage';
+      } else if (affPct < 28.0) {
+        pctEl.style.color = 'var(--amber)';
+        fillEl.style.background = 'linear-gradient(90deg, var(--green), var(--amber))';
+        badgeEl.className = 'gc-badge gc-badge-moderate';
+        badgeEl.textContent = 'Moderate Spread';
+      } else {
+        pctEl.style.color = 'var(--red)';
+        fillEl.style.background = 'linear-gradient(90deg, var(--amber), var(--red))';
+        badgeEl.className = 'gc-badge gc-badge-severe';
+        badgeEl.textContent = 'Severe Lesion Damage';
+      }
+
+      document.getElementById('gc-desc').textContent = gc.description ||
+        `Pathogenic lesion focus covers ${affPct.toFixed(1)}% of total identified leaf surface.`;
+    } else {
+      gcSec.style.display = 'none';
+    }
 
     // Info grid
     const q = d.quality||{}, sev = d.severity||{};
@@ -1177,6 +1779,15 @@
     if (q.warnings?.length) qHtml += `<div class="warn-box"><span>⚠️</span><div><p><strong>Camera warnings:</strong> ${q.warnings.join(', ')}.</p><p style="font-size:0.72rem;color:var(--text-3);margin-top:2px;">Re-acquire in neutral ambient light.</p></div></div>`;
     if (d.demo_mode) qHtml += `<div class="demo-box"><span>ℹ️</span><div><p><strong>Mock prediction loaded</strong></p><p style="font-size:0.72rem;color:var(--text-3);margin-top:2px;">Model weights not found — running fallback demo.</p></div></div>`;
     document.getElementById('quality-wrap').innerHTML = qHtml;
+
+    // Auto-populate bottom MongoDB save card
+    const defPlantName = `Crop Leaf - ${d.prediction.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}`;
+    const pNameInput = document.getElementById('bottom-save-plant-name');
+    if (pNameInput) pNameInput.value = defPlantName;
+    const pDayInput = document.getElementById('bottom-save-day-label');
+    if (pDayInput) pDayInput.value = 'Day 1';
+    const bottomStatus = document.getElementById('save-bottom-status');
+    if (bottomStatus) bottomStatus.style.display = 'none';
   }
 
   /* ── Render Batch Results ────────────────────────────────── */
@@ -1274,6 +1885,8 @@
     document.getElementById('wx-card').style.display='none';
     document.getElementById('wx-pending').style.display='block';
     document.getElementById('batch-prog-wrap').style.display='none';
+    const gcSec = document.getElementById('gradcam-section');
+    if (gcSec) gcSec.style.display = 'none';
     ['top3-bars','info-grid','advice-wrap','risk-wrap','quality-wrap','batch-summary-wrap','batch-timeline-wrap']
       .forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=''; });
   }
@@ -1287,6 +1900,468 @@
   }
   function $show(id) { const el=document.getElementById(id); if(el) el.style.display='block'; }
   function $hide(id) { const el=document.getElementById(id); if(el) el.style.display='none'; }
+
+  /* ── Auth Management & Guest Mode ────────────────────────── */
+  function updateAuthUI() {
+    const pill = document.getElementById('user-pill-label');
+    const authBtn = document.getElementById('btn-open-auth');
+    if (currentUser && currentUser.username) {
+      pill.innerHTML = `🌱 <strong>${currentUser.username}</strong>`;
+      authBtn.textContent = 'Log Out';
+      authBtn.onclick = handleLogout;
+    } else {
+      pill.innerHTML = `👤 Guest Mode`;
+      authBtn.textContent = 'Sign In';
+      authBtn.onclick = () => openAuthModal('login');
+    }
+    refreshRecordCount();
+  }
+
+  function handleLogout() {
+    currentUser = null;
+    localStorage.removeItem('agro_user');
+    updateAuthUI();
+  }
+
+  function openAuthModal(tab = 'login') {
+    switchAuthTab(tab);
+    document.getElementById('auth-err').style.display = 'none';
+    document.getElementById('modal-auth').style.display = 'flex';
+  }
+
+  function closeAuthModal() {
+    document.getElementById('modal-auth').style.display = 'none';
+  }
+
+  function switchAuthTab(tab) {
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+    const tabEl = document.getElementById(`tab-${tab}`);
+    if (tabEl) tabEl.classList.add('active');
+    document.getElementById('form-login').style.display = tab === 'login' ? 'block' : 'none';
+    document.getElementById('form-register').style.display = tab === 'register' ? 'block' : 'none';
+    document.getElementById('panel-guest').style.display = tab === 'guest' ? 'block' : 'none';
+    document.getElementById('auth-err').style.display = 'none';
+  }
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    const id = document.getElementById('login-id').value.trim();
+    const pwd = document.getElementById('login-pwd').value;
+    const errEl = document.getElementById('auth-err');
+    errEl.style.display = 'none';
+
+    try {
+      const res = await fetch(`${API}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: id, password: pwd })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error || 'Login failed.';
+        errEl.style.display = 'block';
+        return;
+      }
+      currentUser = data.user;
+      localStorage.setItem('agro_user', JSON.stringify(currentUser));
+      updateAuthUI();
+      closeAuthModal();
+    } catch {
+      errEl.textContent = 'Cannot connect to backend auth service.';
+      errEl.style.display = 'block';
+    }
+  }
+
+  async function handleRegister(e) {
+    e.preventDefault();
+    const u = document.getElementById('reg-username').value.trim();
+    const em = document.getElementById('reg-email').value.trim();
+    const pwd = document.getElementById('reg-pwd').value;
+    const errEl = document.getElementById('auth-err');
+    errEl.style.display = 'none';
+
+    try {
+      const res = await fetch(`${API}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u, email: em, password: pwd })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error || 'Registration failed.';
+        errEl.style.display = 'block';
+        return;
+      }
+      currentUser = data.user;
+      localStorage.setItem('agro_user', JSON.stringify(currentUser));
+      updateAuthUI();
+      closeAuthModal();
+    } catch {
+      errEl.textContent = 'Cannot connect to backend registration service.';
+      errEl.style.display = 'block';
+    }
+  }
+
+  function continueAsGuest() {
+    currentUser = null;
+    localStorage.removeItem('agro_user');
+    updateAuthUI();
+    closeAuthModal();
+  }
+
+  /* ── Journal (Past Disease Records) ───────────────────────── */
+  function getCurrentUserId() {
+    return currentUser ? (currentUser.user_id || currentUser.username) : 'guest';
+  }
+
+  async function refreshRecordCount() {
+    try {
+      const uid = getCurrentUserId();
+      const res = await fetch(`${API}/api/records?user_id=${encodeURIComponent(uid)}`);
+      const data = await res.json();
+      if (data.success) {
+        const count = data.count || 0;
+        document.getElementById('header-records-count').textContent = count;
+      }
+    } catch {}
+  }
+
+  async function openJournalModal() {
+    document.getElementById('modal-journal').style.display = 'flex';
+    const tag = document.getElementById('journal-user-tag');
+    tag.textContent = currentUser ? `👤 ${currentUser.username}'s Tracked Crops` : `👤 Guest Health Journal`;
+
+    const pill = document.getElementById('journal-storage-pill');
+    try {
+      const st = await (await fetch(`${API}/api/status`)).json();
+      if (st.is_mongo) {
+        pill.textContent = `🍃 MongoDB (${st.database})`;
+        pill.style.background = 'rgba(16,185,129,0.12)';
+        pill.style.color = '#047857';
+      } else {
+        pill.textContent = `📁 Resilient Local Store`;
+        pill.style.background = 'rgba(217,119,6,0.12)';
+        pill.style.color = '#b45309';
+      }
+    } catch {
+      pill.textContent = `⚡ Offline`;
+    }
+
+    await loadJournalList();
+  }
+
+  function closeJournalModal() {
+    document.getElementById('modal-journal').style.display = 'none';
+  }
+
+  async function loadJournalList() {
+    const container = document.getElementById('journal-list-container');
+    container.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--text-3);">Fetching records from database…</div>';
+    const uid = getCurrentUserId();
+
+    try {
+      const res = await fetch(`${API}/api/records?user_id=${encodeURIComponent(uid)}`);
+      const data = await res.json();
+      if (!data.success || !data.records || data.records.length === 0) {
+        container.innerHTML = `
+          <div style="text-align:center;padding:2.5rem 1rem;background:var(--surface2);border-radius:var(--r-md);border:1px dashed var(--border);">
+            <div style="font-size:2.2rem;margin-bottom:0.4rem;">🍃</div>
+            <h4 style="font-size:0.95rem;color:var(--green-xdark);margin-bottom:0.3rem;">No Tracked Leaves Yet</h4>
+            <p style="font-size:0.8rem;color:var(--text-3);max-width:380px;margin:0 auto 1rem;line-height:1.5;">
+              Scan any leaf photo on the homepage and click <strong>"Save Leaf to Journal"</strong> to start tracking Day 1 vs Day 7 healing.
+            </p>
+            <button class="btn btn-sm btn-green" onclick="closeJournalModal()">Scan a Leaf Now</button>
+          </div>`;
+        document.getElementById('header-records-count').textContent = 0;
+        return;
+      }
+
+      userRecordsCache = data.records;
+      document.getElementById('header-records-count').textContent = data.records.length;
+
+      let html = '';
+      data.records.forEach(rec => {
+        const title = rec.plant_name || 'Tracked Leaf';
+        const latestPred = (rec.latest_prediction || 'Unknown').replace(/_/g,' ');
+        const latestPct  = rec.latest_affected_pct != null ? `${rec.latest_affected_pct}%` : '—';
+        const timelineLen = (rec.timeline || []).length;
+        const latestDay   = rec.latest_day || `Checkin #${timelineLen}`;
+
+        let pillColor = 'rgba(16,185,129,0.1)';
+        let textColor = '#047857';
+        const numPct = Number(rec.latest_affected_pct || 0);
+        if (numPct >= 28) { pillColor = 'rgba(220,38,38,0.1)'; textColor = '#dc2626'; }
+        else if (numPct >= 10) { pillColor = 'rgba(217,119,6,0.1)'; textColor = '#b45309'; }
+
+        html += `
+          <div class="journal-card">
+            <div class="jc-head">
+              <div>
+                <div class="jc-title">${title}</div>
+                <div class="jc-dates">Started: ${rec.created_at || 'Recently'} &bull; ${timelineLen} check-in${timelineLen > 1 ? 's' : ''}</div>
+              </div>
+              <span class="jc-pill" style="background:${pillColor};color:${textColor};text-transform:capitalize;">
+                ${latestPred} (${latestPct} affected)
+              </span>
+            </div>
+            <div class="jc-body">
+              <div style="font-size:0.78rem;color:var(--text-2);line-height:1.4;">
+                <strong>Latest Status (${latestDay}):</strong> ${rec.latest_verdict || 'Awaiting follow-up recheck.'}
+              </div>
+              <div class="jc-actions">
+                <button class="btn btn-sm btn-teal" style="padding:0.32rem 0.75rem;font-size:0.75rem;" onclick="openRecheckModal('${rec.record_id}')">
+                  📸 Re-check This Leaf
+                </button>
+                <button class="btn btn-sm" style="background:rgba(220,38,38,0.08);color:#dc2626;border:1px solid rgba(220,38,38,0.2);padding:0.32rem 0.6rem;font-size:0.75rem;" onclick="deleteLeafRecord('${rec.record_id}')" title="Delete record">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          </div>`;
+      });
+      container.innerHTML = html;
+    } catch (err) {
+      container.innerHTML = `<div style="color:var(--red);text-align:center;padding:1.5rem;">Failed to fetch records: ${err.message}</div>`;
+    }
+  }
+
+  async function deleteLeafRecord(recordId) {
+    if (!confirm('Are you sure you want to remove this tracked leaf record?')) return;
+    const uid = getCurrentUserId();
+    try {
+      await fetch(`${API}/api/records/${encodeURIComponent(recordId)}?user_id=${encodeURIComponent(uid)}`, { method: 'DELETE' });
+      await loadJournalList();
+      refreshRecordCount();
+    } catch {}
+  }
+
+  /* ── Save Current Scan to Journal ─────────────────────────── */
+  function openSaveModal() {
+    if (!lastScanResult) {
+      alert('Please run a single leaf scan first before saving.');
+      return;
+    }
+    const defName = `Leaf - ${(lastScanResult.prediction || 'Plant').replace(/_/g,' ')}`;
+    document.getElementById('save-plant-name').value = defName;
+    document.getElementById('save-day-label').value = 'Day 1';
+    document.getElementById('save-notes').value = '';
+    document.getElementById('modal-save-leaf').style.display = 'flex';
+  }
+
+  function closeSaveModal() {
+    document.getElementById('modal-save-leaf').style.display = 'none';
+  }
+
+  async function submitSaveLeaf(e) {
+    e.preventDefault();
+    if (!lastScanResult) return;
+    const name = document.getElementById('save-plant-name').value.trim();
+    const day = document.getElementById('save-day-label').value.trim();
+    const notes = document.getElementById('save-notes').value.trim();
+    const uid = getCurrentUserId();
+
+    const payload = {
+      user_id: uid,
+      plant_name: name,
+      day_label: day,
+      notes: notes,
+      diagnostic: lastScanResult
+    };
+
+    try {
+      const res = await fetch(`${API}/api/records/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save record.');
+
+      closeSaveModal();
+      refreshRecordCount();
+      alert(`✅ "${name}" saved to database! You can re-check this leaf anytime via "Check on Past Disease".`);
+    } catch (err) {
+      alert(`Error saving record: ${err.message}`);
+    }
+  }
+
+  /* ── Re-check Existing Leaf ───────────────────────────────── */
+  function openRecheckModal(recordId) {
+    const rec = userRecordsCache.find(r => r.record_id === recordId);
+    if (!rec) return;
+    activeRecheckRecord = rec;
+
+    closeJournalModal();
+    document.getElementById('modal-recheck').style.display = 'flex';
+    document.getElementById('recheck-result-wrap').style.display = 'none';
+    document.getElementById('recheck-file-input').value = '';
+    document.getElementById('recheck-notes').value = '';
+
+    const timelineLen = (rec.timeline || []).length;
+    document.getElementById('recheck-day-label').value = `Day ${timelineLen * 7 || 7}`;
+
+    const prevCheckin = rec.timeline ? rec.timeline[rec.timeline.length - 1] : null;
+    const prevDay = prevCheckin ? prevCheckin.day_label : 'Day 1';
+    const prevAff = prevCheckin ? prevCheckin.affected_pct : (rec.latest_affected_pct || 0);
+    const prevPred = (rec.latest_prediction || 'Unknown').replace(/_/g,' ');
+
+    document.getElementById('recheck-baseline-summary').innerHTML = `
+      <div style="font-weight:700;color:var(--green-xdark);font-size:0.92rem;margin-bottom:3px;">
+        🌿 Tracking: ${rec.plant_name}
+      </div>
+      <div style="color:var(--text-2);">
+        Comparing against previous scan <strong>${prevDay}</strong> &bull; Diagnosed with <strong>${prevPred}</strong> (${prevAff}% surface affected).
+      </div>`;
+  }
+
+  function closeRecheckModal() {
+    document.getElementById('modal-recheck').style.display = 'none';
+    activeRecheckRecord = null;
+  }
+
+  async function submitRecheck(e) {
+    e.preventDefault();
+    if (!activeRecheckRecord) return;
+
+    const fileInput = document.getElementById('recheck-file-input');
+    if (!fileInput.files || !fileInput.files[0]) {
+      alert('Please select or capture the new photo of this leaf.');
+      return;
+    }
+
+    const file = fileInput.files[0];
+    const dayLabel = document.getElementById('recheck-day-label').value.trim();
+    const notes = document.getElementById('recheck-notes').value.trim();
+    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'field';
+    const useWeather = document.getElementById('use-weather')?.checked ? 'true' : 'false';
+
+    const spin = document.getElementById('recheck-spinner');
+    const btnTxt = document.getElementById('recheck-btn-text');
+    const btn = document.getElementById('btn-submit-recheck');
+    spin.style.display = 'block';
+    btnTxt.textContent = 'Comparing timeline…';
+    btn.disabled = true;
+
+    const fd = new FormData();
+    fd.append('image', file);
+    fd.append('day_label', dayLabel);
+    fd.append('notes', notes);
+    fd.append('mode', mode);
+    fd.append('use_weather', useWeather);
+
+    try {
+      const res = await fetch(`${API}/api/records/${encodeURIComponent(activeRecheckRecord.record_id)}/checkin`, {
+        method: 'POST',
+        body: fd
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Re-check failed.');
+
+      const comp = data.comparison;
+      const resWrap = document.getElementById('recheck-result-wrap');
+      resWrap.style.display = 'block';
+
+      document.getElementById('comp-base-pred').textContent = `${comp.previous_day} (${(data.record.initial_prediction||'').replace(/_/g,' ')})`;
+      document.getElementById('comp-base-pct').textContent = `${comp.previous_affected}%`;
+
+      document.getElementById('comp-curr-pred').textContent = `${data.latest_checkin.day_label} (${(data.latest_checkin.prediction||'').replace(/_/g,' ')})`;
+      document.getElementById('comp-curr-pct').textContent = `${comp.current_affected}%`;
+
+      const vBox = document.getElementById('compare-verdict-box');
+      let bgColor = 'rgba(16,185,129,0.08)';
+      let bdrColor = 'rgba(16,185,129,0.25)';
+      let icon = '🟢';
+
+      if (comp.verdict === 'WORSENED') {
+        bgColor = 'rgba(220,38,38,0.08)';
+        bdrColor = 'rgba(220,38,38,0.25)';
+        icon = '🔴';
+      } else if (comp.verdict === 'NEW_DISEASE') {
+        bgColor = 'rgba(217,119,6,0.08)';
+        bdrColor = 'rgba(217,119,6,0.25)';
+        icon = '⚠️';
+      }
+
+      vBox.style.background = bgColor;
+      vBox.style.border = `1px solid ${bdrColor}`;
+      vBox.innerHTML = `
+        <div style="font-size:1.4rem;">${icon}</div>
+        <div>
+          <div style="font-weight:700;color:var(--green-xdark);">${comp.status_tag} (Delta: ${comp.delta > 0 ? '+' : ''}${comp.delta}%)</div>
+          <div style="color:var(--text-2);font-size:0.8rem;margin-top:2px;">${comp.explanation}</div>
+        </div>`;
+
+      refreshRecordCount();
+    } catch (err) {
+      alert(`Re-check failed: ${err.message}`);
+    } finally {
+      spin.style.display = 'none';
+      btnTxt.textContent = '🔬 Run Comparative Analysis';
+      btn.disabled = false;
+    }
+  }
+
+  /* ── Save to MongoDB from Bottom Card ─────────────────────── */
+  async function submitSaveBottom() {
+    if (!lastScanResult) {
+      alert('Please run a single leaf scan first before saving.');
+      return;
+    }
+    const name = document.getElementById('bottom-save-plant-name').value.trim() || `Crop Leaf - ${(lastScanResult.prediction||'').replace(/_/g,' ')}`;
+    const day = document.getElementById('bottom-save-day-label').value.trim() || 'Day 1';
+    const notes = document.getElementById('bottom-save-notes').value.trim();
+    const statusBox = document.getElementById('save-bottom-status');
+    const btn = document.getElementById('btn-save-bottom');
+    const btnText = document.getElementById('btn-save-bottom-text');
+
+    btn.disabled = true;
+    btnText.textContent = 'Saving to MongoDB…';
+    statusBox.style.display = 'none';
+
+    const uid = getCurrentUserId();
+    const payload = {
+      user_id: uid,
+      plant_name: name,
+      day_label: day,
+      notes: notes,
+      diagnostic: lastScanResult
+    };
+
+    try {
+      const res = await fetch(`${API}/api/records/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save to database.');
+
+      statusBox.style.display = 'block';
+      statusBox.style.background = 'rgba(16,185,129,0.12)';
+      statusBox.style.border = '1px solid rgba(16,185,129,0.3)';
+      statusBox.style.color = '#047857';
+      statusBox.innerHTML = `✅ <strong>Successfully saved to MongoDB Cloud!</strong> Record ID: <code>${data.record.record_id}</code>.<br><span style="font-size:0.78rem;font-weight:400;color:var(--text-2);">This scan is now permanently stored in your database. Click <strong>"View in Check on Past Disease"</strong> to see its timeline.</span>`;
+
+      refreshRecordCount();
+    } catch (err) {
+      statusBox.style.display = 'block';
+      statusBox.style.background = 'rgba(220,38,38,0.1)';
+      statusBox.style.border = '1px solid rgba(220,38,38,0.25)';
+      statusBox.style.color = '#dc2626';
+      statusBox.textContent = `❌ Error saving: ${err.message}`;
+    } finally {
+      btn.disabled = false;
+      btnText.textContent = '💾 Save to MongoDB';
+    }
+  }
+
+  // Bind Listeners
+  document.getElementById('btn-header-journal').addEventListener('click', openJournalModal);
+  document.getElementById('btn-hero-journal').addEventListener('click', openJournalModal);
+  document.getElementById('btn-save-current-scan').addEventListener('click', openSaveModal);
+  document.getElementById('btn-save-bottom').addEventListener('click', submitSaveBottom);
+  document.getElementById('btn-open-from-bottom').addEventListener('click', openJournalModal);
+  updateAuthUI();
 </script>
 </body>
 </html>

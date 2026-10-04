@@ -36,5 +36,8 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Logs
+# Logs & Environment
 *.log
+.env
+.env.*
+backend/data_store.json
