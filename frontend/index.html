@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgroIntelli — Advanced Crop Disease Intelligence</title>
+  <meta name="description" content="AI-powered crop leaf disease detection with batch timeline analysis, weather-based spread risk, and agronomic treatment advisories." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* ════════════════════════════════════════════════════════════
+       DESIGN TOKENS & RESET
+    ════════════════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #eef3f0;
+      --bg2:          #e6ede9;
+      --surface:      #ffffff;
+      --surface2:     #f8faf9;
+      --border:       rgba(16,185,129,0.12);
+      --border-strong:rgba(16,185,129,0.25);
+
+      --green:        #10b981;
+      --green-dark:   #059669;
+      --green-xdark:  #064e3b;
+      --teal:         #06b6d4;
+      --teal-dark:    #0891b2;
+      --mint:         #34d399;
+      --amber:        #d97706;
+      --red:          #dc2626;
+
+      --text-1:       #111827;
+      --text-2:       #374151;
+      --text-3:       #6b7280;
+      --text-4:       #9ca3af;
+
+      --sh-xs: 0 1px 4px rgba(0,0,0,0.04);
+      --sh-sm: 0 2px 10px rgba(0,0,0,0.05);
+      --sh-md: 0 8px 28px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.03);
+      --sh-lg: 0 16px 48px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+      --sh-green: 0 8px 32px rgba(16,185,129,0.12);
+      --sh-teal:  0 8px 32px rgba(6,182,212,0.12);
+
+      --r-xl: 20px;
+      --r-lg: 16px;
+      --r-md: 12px;
+      --r-sm: 8px;
+      --r-xs: 6px;
+
+      --ease: all 0.25s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 70% -10%, rgba(16,185,129,0.10) 0%, transparent 65%),
+        radial-gradient(ellipse 50% 40% at 5% 80%,  rgba(6,182,212,0.06) 0%, transparent 60%);
+      color: var(--text-1);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.55;
+    }
+
+    h1,h2,h3,h4 { font-family:'Plus Jakarta Sans',sans-serif; font-weight:700; letter-spacing:-0.02em; }
+
+    ::-webkit-scrollbar { width:6px; height:6px; }
+    ::-webkit-scrollbar-track { background:var(--bg); }
+    ::-webkit-scrollbar-thumb { background:rgba(16,185,129,0.2); border-radius:4px; }
+    ::-webkit-scrollbar-thumb:hover { background:rgba(16,185,129,0.35); }
+
+    /* ════════════════════════════════════════════════════════════
+       HEADER
+    ════════════════════════════════════════════════════════════ */
+    header {
+      background: rgba(255,255,255,0.82);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-bottom: 1px solid rgba(16,185,129,0.1);
+      padding: 0.85rem 2.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top:0; z-index:200;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.03);
+    }
+    .logo-wrap { display:flex; align-items:center; gap:0.85rem; }
+    .logo-icon {
+      width:40px; height:40px; border-radius:var(--r-sm);
+      background: linear-gradient(135deg,#10b981,#06b6d4);
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.3rem;
+      box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+    }
+    .logo-text-wrap h1 { font-size:1.25rem; color:var(--green-xdark); line-height:1.1; }
+    .logo-text-wrap p  { font-size:0.7rem; color:var(--text-3); font-weight:500; margin-top:1px; }
+
+    .header-right { display:flex; align-items:center; gap:1rem; }
+    .status-pill {
+      display:flex; align-items:center; gap:0.45rem;
+      padding:0.38rem 0.9rem;
+      border-radius:30px; font-size:0.72rem; font-weight:600;
+      border:1px solid rgba(0,0,0,0.06); background:rgba(0,0,0,0.02);
+      transition:var(--ease);
+    }
+    .status-pill .dot {
+      width:7px; height:7px; border-radius:50%; background:#9ca3af; flex-shrink:0;
+    }
+    .status-pill.online  { background:rgba(16,185,129,0.08); border-color:rgba(16,185,129,0.22); color:#047857; }
+    .status-pill.online .dot  { background:#10b981; box-shadow:0 0 7px #10b981; animation:pulse 2s infinite; }
+    .status-pill.offline { background:rgba(220,38,38,0.07); border-color:rgba(220,38,38,0.2); color:#b91c1c; }
+    .status-pill.offline .dot { background:#ef4444; box-shadow:0 0 7px #ef4444; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+    /* ════════════════════════════════════════════════════════════
+       PAGE LAYOUT
+    ════════════════════════════════════════════════════════════ */
+    .page {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 2rem 1.75rem 5rem;
+      display: flex; flex-direction: column; gap: 1.75rem;
+    }
+
+    /* ════════════════════════════════════════════════════════════
+       CARD BASE
+    ════════════════════════════════════════════════════════════ */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      padding: 1.75rem;
+      box-shadow: var(--sh-md), var(--sh-green);
+      position: relative; overflow:hidden;
+      transition: border-color 0.22s ease, box-shadow 0.22s ease;
+    }
+    .card::after {
+      content:''; position:absolute; top:0; left:0; right:0; height:3px;
+      background: linear-gradient(90deg, transparent 5%, rgba(16,185,129,0.45) 50%, transparent 95%);
+    }
+    .card:hover { border-color:var(--border-strong); box-shadow:var(--sh-lg), var(--sh-green); }
+
+    .card-header {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:1.35rem;
+    }
+    .card-title {
+      display:flex; align-items:center; gap:0.6rem;
+      font-size:1.05rem; color:var(--green-xdark); font-weight:700;
+    }
+    .card-title-icon {
+      width:34px; height:34px; border-radius:var(--r-sm);
+      background: linear-gradient(135deg,rgba(16,185,129,0.12),rgba(6,182,212,0.08));
+      border:1px solid rgba(16,185,129,0.15);
+      display:flex; align-items:center; justify-content:center; font-size:1.1rem;
+    }
+    .card-badge {
+      font-size:0.68rem; font-weight:700; padding:0.22rem 0.6rem;
+      border-radius:20px; background:rgba(16,185,129,0.08);
+      color:var(--green-dark); border:1px solid rgba(16,185,129,0.15);
+    }
+
+    /* ════════════════════════════════════════════════════════════
+       TOP ROW (2-col)
+    ════════════════════════════════════════════════════════════ */
+    .top-row {
+      display:grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap:1.75rem; align-items:start;
+    }
+    @media(max-width:900px) { .top-row{grid-template-columns:1fr;} }
+
+    /* ════════════════════════════════════════════════════════════
+       UPLOAD ZONE
+    ════════════════════════════════════════════════════════════ */
+    .upload-zone {
+      border: 2px dashed rgba(16,185,129,0.25);
+      border-radius:var(--r-lg);
+      padding: 2.5rem 1.5rem;
+      text-align:center; cursor:pointer;
+      background: linear-gradient(145deg, rgba(16,185,129,0.015), rgba(6,182,212,0.01));
+      transition: var(--ease); position:relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      background: rgba(16,185,129,0.04);
+      border-color: var(--green);
+      box-shadow: inset 0 0 24px rgba(16,185,129,0.04);
+    }
+    /* The file input spans the whole zone — NO pointer-events:none here */
+    .upload-zone > input[type="file"] {
+      position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%;
+    }
+    .upload-zone.compact { padding:0.9rem 1.1rem; display:flex; align-items:center; gap:0.85rem; text-align:left; border-style:solid; border-color:rgba(16,185,129,0.2); }
+    .upload-zone.compact .uz-icon { font-size:1.4rem; animation:none !important; margin:0; }
+    .upload-zone.compact .uz-sub  { display:none; }
+    .upload-zone.compact .uz-hint { display:none; }
+    .uz-icon { font-size:2.6rem; display:block; margin-bottom:0.5rem; animation:float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+    .uz-label { font-size:0.95rem; color:var(--text-2); }
+    .uz-label strong { color:var(--green); font-weight:600; }
+    .uz-sub  { font-size:0.78rem; color:var(--text-3); margin-top:3px; }
+    .uz-hint { font-size:0.7rem; color:var(--text-4); display:block; margin-top:5px; }
+
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-7px)} 40%,80%{transform:translateX(7px)} }
+    .shake { animation:shake 0.35s ease-in-out; border-color:var(--red)!important; background:rgba(220,38,38,0.025)!important; }
+
+    /* Preview block */
+    #preview-wrap {
+      display:none; margin-top:1rem; border-radius:var(--r-md); overflow:hidden;
+      position:relative; border:1px solid var(--border); box-shadow:var(--sh-sm);
+      animation:slideUp 0.25s ease;
+    }
+    @keyframes slideUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    #preview-img { width:100%; max-height:230px; object-fit:contain; display:block; padding:0.35rem; background:var(--surface2); }
+    #remove-img {
+      position:absolute; top:8px; right:8px;
+      background:rgba(0,0,0,0.6); color:#fff; border:none; border-radius:50%;
+      width:26px; height:26px; font-size:0.72rem; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; transition:var(--ease);
+    }
+    #remove-img:hover { background:var(--red); transform:scale(1.1); }
+
+    .batch-scroll-btn {
+      display:inline-flex; align-items:center; gap:0.4rem; margin-top:1rem;
+      padding:0.5rem 1rem; border-radius:var(--r-md); cursor:pointer;
+      font-size:0.78rem; font-weight:700; color:var(--green-xdark);
+      background:rgba(16,185,129,0.07); border:1px solid rgba(16,185,129,0.16);
+      transition:var(--ease);
+    }
+    .batch-scroll-btn:hover { background:rgba(16,185,129,0.13); border-color:var(--green); transform:translateY(-1px); }
+
+    /* ════════════════════════════════════════════════════════════
+       RIGHT CONTROLS CARD
+    ════════════════════════════════════════════════════════════ */
+    .ctrl-section { display:flex; flex-direction:column; gap:1.2rem; }
+
+    .ctrl-section-label {
+      font-size:0.7rem; font-weight:700; text-transform:uppercase;
+      letter-spacing:0.09em; color:var(--text-3); margin-bottom:0.5rem;
+    }
+
+    /* Mode cards */
+    .mode-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.65rem; }
+    .mode-card {
+      background:var(--surface2); border:1px solid rgba(0,0,0,0.05);
+      border-radius:var(--r-md); padding:0.85rem 0.8rem;
+      cursor:pointer; display:flex; align-items:center; gap:0.65rem;
+      transition:var(--ease); user-select:none;
+    }
+    .mode-card:hover { background:rgba(16,185,129,0.03); border-color:rgba(16,185,129,0.15); }
+    .mode-card.active {
+      background:rgba(16,185,129,0.06); border-color:var(--green);
+      box-shadow:0 2px 10px rgba(16,185,129,0.08);
+    }
+    .mc-icon {
+      width:36px; height:36px; border-radius:var(--r-sm);
+      background:#fff; border:1px solid rgba(0,0,0,0.06);
+      display:flex; align-items:center; justify-content:center; font-size:1.3rem;
+      flex-shrink:0; transition:var(--ease);
+    }
+    .mode-card.active .mc-icon { background:rgba(16,185,129,0.1); border-color:rgba(16,185,129,0.25); }
+    .mc-title { font-size:0.86rem; font-weight:600; color:var(--green-xdark); }
+    .mc-desc  { font-size:0.67rem; color:var(--text-3); margin-top:1px; }
+
+    /* Toggle pill */
+    .toggle-pill {
+      background:var(--surface2); border:1px solid rgba(0,0,0,0.05);
+      border-radius:var(--r-md); padding:0.85rem 1rem;
+      display:flex; align-items:center; justify-content:space-between; gap:0.8rem;
+    }
+    .tp-info {}
+    .tp-title { font-size:0.86rem; font-weight:600; color:var(--green-xdark); }
+    .tp-desc  { font-size:0.68rem; color:var(--text-3); margin-top:2px; line-height:1.4; }
+    .switch { position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
+    .switch input { opacity:0; width:0; height:0; }
+    .slider { position:absolute; cursor:pointer; inset:0; background:rgba(0,0,0,0.1); border-radius:34px; transition:.28s; }
+    .slider::before { position:absolute; content:''; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; box-shadow:0 1px 4px rgba(0,0,0,0.25); transition:.28s cubic-bezier(0.4,0,0.2,1); }
+    .switch input:checked + .slider { background:var(--green); }
+    .switch input:checked + .slider::before { transform:translateX(20px); }
+
+    /* Primary action button */
+    .btn {
+      width:100%; padding:0.92rem 1.2rem;
+      border:none; border-radius:var(--r-md);
+      font-family:'Plus Jakarta Sans',sans-serif;
+      font-size:0.95rem; font-weight:700; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; gap:0.5rem;
+      transition:var(--ease); letter-spacing:-0.01em; position:relative; overflow:hidden;
+    }
+    .btn::before {
+      content:''; position:absolute; inset:0;
+      background:rgba(255,255,255,0); transition:background 0.2s;
+    }
+    .btn:hover:not(:disabled)::before { background:rgba(255,255,255,0.08); }
+    .btn-green {
+      background:linear-gradient(135deg,var(--green),var(--green-dark));
+      color:#fff; box-shadow:0 4px 16px rgba(16,185,129,0.22);
+    }
+    .btn-green:hover:not(:disabled) { transform:translateY(-1.5px); box-shadow:0 7px 22px rgba(16,185,129,0.3); }
+    .btn-teal  {
+      background:linear-gradient(135deg,var(--teal),var(--teal-dark));
+      color:#fff; box-shadow:0 4px 16px rgba(6,182,212,0.22);
+    }
+    .btn-teal:hover:not(:disabled) { transform:translateY(-1.5px); box-shadow:0 7px 22px rgba(6,182,212,0.3); }
+    .btn:active:not(:disabled) { transform:translateY(0) !important; }
+    .btn:disabled { opacity:0.38; cursor:not-allowed; background:rgba(0,0,0,0.07); color:var(--text-4); box-shadow:none; }
+
+    .spinner { width:17px; height:17px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .65s linear infinite; display:none; flex-shrink:0; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    /* Hidden radio (no pointer-events kill needed - these are truly hidden) */
+    .radio-hidden { position:absolute; opacity:0; width:0; height:0; pointer-events:none; }
+
+    /* ════════════════════════════════════════════════════════════
+       BATCH ANALYSIS — FULL WIDTH
+    ════════════════════════════════════════════════════════════ */
+    .step-indicator {
+      display:flex; align-items:center; gap:0; margin-bottom:1.5rem;
+    }
+    .step-item {
+      display:flex; align-items:center; gap:0.5rem; flex:1;
+    }
+    .step-item:last-child { flex:0; }
+    .step-dot {
+      width:28px; height:28px; border-radius:50%; flex-shrink:0;
+      background:rgba(16,185,129,0.08); border:2px solid rgba(16,185,129,0.2);
+      display:flex; align-items:center; justify-content:center;
+      font-size:0.72rem; font-weight:700; color:var(--green);
+      transition:var(--ease);
+    }
+    .step-dot.filled {
+      background:var(--green); border-color:var(--green); color:#fff;
+      box-shadow:0 2px 8px rgba(16,185,129,0.3);
+    }
+    .step-dot.filled::after { content:'✓'; font-size:0.82rem; }
+    .step-dot.filled span { display:none; }
+    .step-line { flex:1; height:2px; background:rgba(16,185,129,0.12); margin:0 0.25rem; transition:var(--ease); }
+    .step-line.filled { background:var(--green); }
+    .step-label { font-size:0.68rem; font-weight:600; color:var(--text-3); }
+
+    /* Batch slot grid */
+    .batch-grid {
+      display:grid; grid-template-columns:repeat(3,1fr); gap:1.25rem;
+    }
+    @media(max-width:640px) { .batch-grid{grid-template-columns:1fr;} }
+
+    .batch-slot {
+      border:2px dashed rgba(16,185,129,0.2);
+      border-radius:var(--r-lg);
+      background:linear-gradient(145deg,rgba(16,185,129,0.01),rgba(6,182,212,0.005));
+      transition:var(--ease); position:relative;
+      cursor:pointer; overflow:hidden;
+    }
+    .batch-slot:hover { border-color:var(--green); background:rgba(16,185,129,0.03); box-shadow:var(--sh-sm); }
+    .batch-slot.has-file { border-style:solid; border-color:rgba(16,185,129,0.3); background:rgba(16,185,129,0.02); }
+    .batch-slot.drag-over { border-color:var(--green); background:rgba(16,185,129,0.06); box-shadow:0 0 0 4px rgba(16,185,129,0.08); }
+
+    /* THE FIX: file input covers entire slot, pointer-events:auto */
+    .batch-file-input {
+      position:absolute; inset:0; opacity:0; cursor:pointer;
+      width:100%; height:100%;
+      pointer-events:auto; /* critical: allow clicks */
+    }
+
+    .batch-slot-body { padding:1.25rem 1rem; display:flex; flex-direction:column; align-items:center; gap:0.7rem; }
+
+    .bs-day-tag {
+      font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;
+      color:var(--green); background:rgba(16,185,129,0.08);
+      padding:0.2rem 0.6rem; border-radius:20px; border:1px solid rgba(16,185,129,0.15);
+    }
+    .bs-thumb-wrap {
+      width:72px; height:72px; border-radius:var(--r-md);
+      background:#fff; border:1.5px dashed rgba(16,185,129,0.22);
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.8rem; overflow:hidden; transition:var(--ease); flex-shrink:0;
+    }
+    .batch-slot:hover .bs-thumb-wrap { border-color:var(--green); background:rgba(16,185,129,0.04); }
+    .bs-thumb-wrap img { width:100%; height:100%; object-fit:cover; border-radius:var(--r-md); }
+    .bs-upload-cta {
+      font-size:0.72rem; font-weight:700; color:var(--green);
+      background:rgba(16,185,129,0.06); padding:0.28rem 0.65rem;
+      border-radius:4px; border:1px solid rgba(16,185,129,0.14);
+    }
+    .bs-fname {
+      font-size:0.65rem; color:var(--text-3);
+      max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center;
+    }
+
+    /* Batch run row */
+    .batch-run-row {
+      display:flex; justify-content:center; align-items:center; margin-top:1.5rem;
+      gap:0.75rem; flex-wrap:wrap;
+    }
+    .batch-run-row .btn { max-width:320px; }
+
+    .batch-counter {
+      font-size:0.78rem; color:var(--text-3); font-weight:500;
+    }
+    .batch-counter strong { color:var(--green-xdark); }
+
+    /* ════════════════════════════════════════════════════════════
+       DIAGNOSTICS PANEL — FULL WIDTH
+    ════════════════════════════════════════════════════════════ */
+    .diag-placeholder {
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      padding:4rem 2rem; text-align:center; gap:0;
+    }
+    .ph-anim-wrap { width:110px; height:110px; position:relative; margin-bottom:1.25rem; }
+    .ph-leaf { fill:none; stroke:url(#lgf); stroke-width:2.5; stroke-dasharray:420; stroke-dashoffset:420; animation:drawl 4s ease-in-out infinite alternate; }
+    @keyframes drawl { to{stroke-dashoffset:0} }
+    .ph-scan {
+      position:absolute; top:5%; left:0; width:100%; height:2px;
+      background:linear-gradient(90deg,transparent,var(--green),transparent);
+      box-shadow:0 0 10px var(--green); animation:scan 2.8s linear infinite;
+    }
+    @keyframes scan { 0%{top:5%;opacity:0} 10%,90%{opacity:0.9} 100%{top:92%;opacity:0} }
+    .ph-title { font-size:1.05rem; font-weight:700; color:var(--green-xdark); }
+    .ph-sub   { font-size:0.82rem; color:var(--text-3); max-width:280px; margin-top:5px; line-height:1.5; }
+
+    /* Results */
+    #results-view { display:none; }
+    .results-flow { display:flex; flex-direction:column; gap:1.5rem; }
+
+    /* Hero banner */
+    .hero-banner {
+      background:linear-gradient(135deg,rgba(16,185,129,0.06) 0%,rgba(6,182,212,0.03) 100%);
+      border:1px solid rgba(16,185,129,0.14); border-radius:var(--r-lg);
+      padding:1.4rem 1.75rem;
+      display:flex; align-items:center; justify-content:space-between; gap:1.5rem;
+      box-shadow:var(--sh-xs);
+    }
+    @media(max-width:540px){.hero-banner{flex-direction:column;text-align:center;}}
+    .hb-tag  { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--green); }
+    .hb-name { font-size:1.4rem; font-weight:800; color:var(--green-xdark); text-transform:capitalize; line-height:1.2; margin-top:2px; }
+
+    /* SVG gauge */
+    .gauge-wrap { position:relative; width:82px; height:82px; flex-shrink:0; }
+    .g-svg { transform:rotate(-90deg); }
+    .g-bg   { fill:none; stroke:rgba(0,0,0,0.05); stroke-width:7; }
+    .g-fill { fill:none; stroke:url(#gg); stroke-width:7; stroke-linecap:round; transition:stroke-dashoffset 0.9s cubic-bezier(0.4,0,0.2,1); }
+    .gauge-pct {
+      position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      font-family:'Plus Jakarta Sans',sans-serif; font-size:1.05rem; font-weight:800; color:var(--green-xdark);
+    }
+
+    /* Section title */
+    .sec-head {
+      font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.09em; color:var(--text-3);
+      border-bottom:1px solid rgba(16,185,129,0.1); padding-bottom:0.4rem;
+      margin-bottom:0.8rem; display:flex; align-items:center; gap:0.4rem;
+    }
+
+    /* Classifier bars */
+    .bar-list { display:flex; flex-direction:column; gap:0.8rem; }
+    .bar-label { display:flex; justify-content:space-between; font-size:0.82rem; margin-bottom:4px; }
+    .bar-cn { color:var(--text-1); font-weight:500; text-transform:capitalize; }
+    .bar-pv { color:var(--green); font-weight:700; }
+    .bar-track { background:rgba(0,0,0,0.03); border-radius:10px; height:10px; overflow:hidden; }
+    .bar-fill { height:100%; border-radius:10px; width:0; background:linear-gradient(90deg,var(--teal),var(--green)); transition:width 0.85s cubic-bezier(0.4,0,0.2,1); }
+
+    /* Diagnostics grid */
+    .info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:0.7rem; }
+    .info-box { background:var(--surface2); border:1px solid rgba(0,0,0,0.04); border-radius:var(--r-md); padding:0.85rem 1rem; }
+    .info-box .ib-l { font-size:0.67rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3); font-weight:600; }
+    .info-box .ib-v { font-size:1rem; font-weight:700; color:var(--green-xdark); margin-top:2px; }
+
+    /* Risk panel */
+    .risk-box { background:var(--surface2); border:1px solid rgba(0,0,0,0.04); border-radius:var(--r-md); padding:1rem 1.1rem; }
+    .risk-head { display:flex; align-items:center; gap:0.65rem; margin-bottom:0.45rem; flex-wrap:wrap; }
+    .risk-badge { display:inline-flex; align-items:center; padding:0.2rem 0.6rem; border-radius:20px; font-size:0.7rem; font-weight:700; text-transform:uppercase; }
+    .risk-HIGH     { background:rgba(220,38,38,0.09); color:#dc2626; border:1px solid rgba(220,38,38,0.18); }
+    .risk-MODERATE { background:rgba(217,119,6,0.09); color:#d97706; border:1px solid rgba(217,119,6,0.18); }
+    .risk-LOW,.risk-None { background:rgba(16,185,129,0.09); color:#047857; border:1px solid rgba(16,185,129,0.18); }
+    .risk-score { font-size:0.8rem; font-weight:700; color:var(--green-xdark); }
+    .risk-desc { font-size:0.8rem; color:var(--text-2); line-height:1.55; }
+
+    /* Treatment */
+    .care-box {
+      border-left:4px solid var(--amber); border-radius:0 var(--r-md) var(--r-md) 0;
+      background:linear-gradient(135deg,rgba(217,119,6,0.04),transparent);
+      padding:1.1rem 1.3rem; font-size:0.87rem; line-height:1.6; color:var(--text-1);
+    }
+    .care-tag { font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--amber); margin-bottom:0.35rem; }
+
+    /* Warning / demo panels */
+    .warn-box,.demo-box {
+      border-radius:var(--r-md); padding:0.8rem 1rem;
+      display:flex; align-items:flex-start; gap:0.6rem; margin-top:0.6rem;
+    }
+    .warn-box { background:rgba(220,38,38,0.04); border:1px solid rgba(220,38,38,0.14); }
+    .warn-box p { font-size:0.78rem; color:#991b1b; }
+    .demo-box { background:rgba(6,182,212,0.05); border:1px solid rgba(6,182,212,0.18); }
+    .demo-box p { font-size:0.78rem; color:#0891b2; }
+
+    /* Weather widget */
+    .wx-widget { background:rgba(16,185,129,0.03); border:1px solid var(--border); border-radius:var(--r-md); padding:1.1rem; }
+    .wx-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem; }
+    .wx-head h4 { font-size:0.88rem; color:var(--green-xdark); }
+    .wx-head span { font-size:0.72rem; color:var(--text-3); font-weight:500; }
+    .wx-tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(72px,1fr)); gap:0.5rem; }
+    .wx-tile { background:#fff; border:1px solid rgba(16,185,129,0.08); border-radius:var(--r-sm); padding:0.6rem 0.4rem; text-align:center; transition:var(--ease); }
+    .wx-tile:hover { border-color:var(--green); transform:translateY(-1px); box-shadow:var(--sh-xs); }
+    .wx-tile .wi { font-size:1.2rem; margin-bottom:2px; }
+    .wx-tile .wv { font-size:0.82rem; font-weight:700; color:var(--green-xdark); }
+    .wx-tile .wl { font-size:0.62rem; color:var(--text-3); margin-top:1px; }
+    .wx-ts { font-size:0.62rem; color:var(--text-4); text-align:right; margin-top:0.45rem; }
+    .wx-pending { font-size:0.75rem; color:var(--text-3); font-style:italic; padding:0.5rem; text-align:center; }
+
+    /* Batch progression extras */
+    .prog-card {
+      border-left:4px solid var(--green); border-radius:0 var(--r-md) var(--r-md) 0;
+      background:linear-gradient(135deg,rgba(16,185,129,0.05),transparent);
+      padding:1rem 1.25rem;
+    }
+    .prog-title { font-size:0.92rem; font-weight:700; color:var(--green-xdark); margin-bottom:0.25rem; }
+    .prog-desc  { font-size:0.83rem; color:var(--text-2); line-height:1.5; }
+    .prog-note  { font-size:0.7rem; color:var(--text-4); margin-top:0.4rem; }
+
+    .sparkline-card { background:#fff; border:1px solid var(--border); border-radius:var(--r-md); padding:1.1rem; box-shadow:var(--sh-xs); }
+    .spark-lbl { font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-3); margin-bottom:0.75rem; }
+    .spark-svg-wrap { width:100%; height:118px; }
+
+    .tl-list { display:flex; flex-direction:column; gap:0.85rem; position:relative; padding-left:1.6rem; }
+    .tl-list::before { content:''; position:absolute; left:7px; top:0; bottom:0; width:2px; background:rgba(16,185,129,0.12); }
+    .tl-card { background:#fff; border:1px solid rgba(16,185,129,0.08); border-radius:var(--r-md); padding:1rem; position:relative; transition:var(--ease); box-shadow:var(--sh-xs); }
+    .tl-card:hover { border-color:rgba(16,185,129,0.22); box-shadow:var(--sh-sm); }
+    .tl-card::before { content:''; position:absolute; left:-21px; top:20px; width:10px; height:10px; border-radius:50%; background:#d1d5db; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.12); }
+    .tl-card.active::before { background:var(--green); box-shadow:0 0 8px rgba(16,185,129,0.5); }
+    .tl-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.55rem; flex-wrap:wrap; gap:0.35rem; }
+    .tl-day { font-family:'Plus Jakarta Sans',sans-serif; font-size:0.83rem; font-weight:700; color:var(--green-xdark); display:flex; align-items:center; gap:0.4rem; }
+    .tl-thumb { width:22px; height:22px; border-radius:4px; object-fit:cover; border:1px solid rgba(16,185,129,0.12); }
+    .delta { font-size:0.7rem; font-weight:600; padding:0.15rem 0.5rem; border-radius:12px; }
+    .delta-up  { background:rgba(220,38,38,0.09); color:#dc2626; }
+    .delta-dn  { background:rgba(16,185,129,0.09); color:#047857; }
+    .delta-st  { background:rgba(0,0,0,0.05); color:var(--text-3); }
+    .tl-body { display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; font-size:0.78rem; }
+    .tl-body>div { display:flex; flex-direction:column; }
+    .tl-sl { color:var(--text-3); font-size:0.67rem; text-transform:uppercase; letter-spacing:0.04em; }
+    .tl-sv { color:var(--text-1); font-weight:600; margin-top:1px; }
+
+    /* Error */
+    .err-box { background:rgba(220,38,38,0.04); border:1px solid rgba(220,38,38,0.15); border-radius:var(--r-md); padding:1rem 1.1rem; color:#b91c1c; font-size:0.86rem; display:flex; gap:0.7rem; align-items:flex-start; }
+
+    /* Footer */
+    footer { text-align:center; padding:2rem 1.5rem; color:var(--text-4); font-size:0.73rem; border-top:1px solid rgba(16,185,129,0.08); background:rgba(255,255,255,0.4); }
+
+    /* Responsive tweaks */
+    @media(max-width:640px){
+      header { padding:0.75rem 1.1rem; }
+      .page  { padding:1rem 1rem 4rem; }
+      .card  { padding:1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════ HEADER ══════════════ -->
+<header>
+  <div class="logo-wrap">
+    <div class="logo-icon">🌿</div>
+    <div class="logo-text-wrap">
+      <h1>AgroIntelli</h1>
+      <p>AI Crop Disease Intelligence Platform</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="status-pill">
+      <span class="dot"></span>
+      <span id="status-text">Checking…</span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- ══════════════ TOP ROW: Upload + Controls ══════════════ -->
+  <div class="top-row">
+
+    <!-- LEFT: Upload card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-title-icon">📷</div>
+          Diagnostic Uploader
+        </div>
+        <div class="card-badge" id="upload-status-badge">No image</div>
+      </div>
+
+      <!-- Upload drop zone -->
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input" accept="image/*" />
+        <span class="uz-icon">🍃</span>
+        <p class="uz-label"><strong>Click to upload</strong> or drag &amp; drop</p>
+        <p class="uz-sub">Supports JPG, JPEG or PNG leaf photos</p>
+        <span class="uz-hint">Clear, close-up leaf photo recommended for best accuracy</span>
+      </div>
+
+      <!-- Preview -->
+      <div id="preview-wrap">
+        <img id="preview-img" src="" alt="Uploaded Leaf Preview" />
+        <button id="remove-img" title="Remove image">✕</button>
+      </div>
+
+      <!-- Batch shortcut -->
+      <button class="batch-scroll-btn" id="batch-scroll-btn">
+        🧪 Batch Timeline Analysis ▼
+      </button>
+    </div>
+
+    <!-- RIGHT: Controls card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-title-icon">⚡</div>
+          Diagnostic Controls
+        </div>
+      </div>
+
+      <div class="ctrl-section">
+
+        <!-- Analysis Mode -->
+        <div>
+          <div class="ctrl-section-label">🌾 Analysis Mode</div>
+          <div class="mode-grid">
+            <div class="mode-card active" id="card-field">
+              <div class="mc-icon">🌾</div>
+              <div>
+                <div class="mc-title">Field Mode</div>
+                <div class="mc-desc">Ensemble &amp; segmentation</div>
+              </div>
+            </div>
+            <div class="mode-card" id="card-lab">
+              <div class="mc-icon">🔬</div>
+              <div>
+                <div class="mc-title">Lab Mode</div>
+                <div class="mc-desc">Fast, single-pass</div>
+              </div>
+            </div>
+          </div>
+          <!-- Hidden radios — pointer-events:none is fine here, they're truly hidden -->
+          <input type="radio" name="mode" id="mode-field" value="field" class="radio-hidden" checked />
+          <input type="radio" name="mode" id="mode-lab"   value="lab"   class="radio-hidden" />
+        </div>
+
+        <!-- Image timing toggle -->
+        <div>
+          <div class="ctrl-section-label">📡 Image Timing</div>
+          <div class="toggle-pill">
+            <div class="tp-info">
+              <div class="tp-title">Captured live or recently?</div>
+              <div class="tp-desc">Enables live weather data to compute epidemic spread risk</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="use-weather" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Single scan button -->
+        <div>
+          <div class="ctrl-section-label">⚡ Run Diagnostics</div>
+          <button class="btn btn-green" id="predict-btn">
+            <div class="spinner" id="spinner"></div>
+            <span id="btn-text">🔍 Run Single Leaf Scan</span>
+          </button>
+          <p style="font-size:0.7rem;color:var(--text-4);margin-top:0.55rem;line-height:1.4;">Evaluates disease class, confidence &amp; severity for the uploaded image.</p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ FULL-WIDTH: BATCH ANALYSIS ══════════════ -->
+  <div class="card" id="batch-section">
+    <div class="card-header">
+      <div class="card-title">
+        <div class="card-title-icon">🧪</div>
+        Batch Timeline Analysis
+      </div>
+      <div class="card-badge" id="batch-count-badge">0 / 3 uploaded</div>
+    </div>
+
+    <p style="font-size:0.83rem;color:var(--text-3);line-height:1.55;margin-bottom:1.35rem;">
+      Upload three sequential leaf images in chronological order to evaluate disease progression trends, severity delta, and spreading velocity across the timeline.
+    </p>
+
+    <!-- Step indicator -->
+    <div class="step-indicator">
+      <div class="step-item">
+        <div class="step-dot" id="step-dot-0"><span>1</span></div>
+        <div class="step-line" id="step-line-0"></div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot" id="step-dot-1"><span>2</span></div>
+        <div class="step-line" id="step-line-1"></div>
+      </div>
+      <div class="step-item">
+        <div class="step-dot" id="step-dot-2"><span>3</span></div>
+      </div>
+    </div>
+
+    <!-- 3 upload slots -->
+    <div class="batch-grid">
+
+      <!-- Slot 0: Day 1 -->
+      <div class="batch-slot" id="batch-slot-0">
+        <!-- File input covers entire slot, pointer-events:auto (no hidden-input class) -->
+        <input type="file" class="batch-file-input" accept="image/*" data-index="0" id="batch-input-0" />
+        <div class="batch-slot-body">
+          <div class="bs-day-tag">Day 1</div>
+          <div class="bs-thumb-wrap" id="bs-thumb-0">📅</div>
+          <div class="bs-upload-cta">Click or Drop to Upload</div>
+          <div class="bs-fname" id="bs-fname-0">No file selected</div>
+        </div>
+      </div>
+
+      <!-- Slot 1: Day 5 -->
+      <div class="batch-slot" id="batch-slot-1">
+        <input type="file" class="batch-file-input" accept="image/*" data-index="1" id="batch-input-1" />
+        <div class="batch-slot-body">
+          <div class="bs-day-tag">Day 5</div>
+          <div class="bs-thumb-wrap" id="bs-thumb-1">📅</div>
+          <div class="bs-upload-cta">Click or Drop to Upload</div>
+          <div class="bs-fname" id="bs-fname-1">No file selected</div>
+        </div>
+      </div>
+
+      <!-- Slot 2: Day 10 -->
+      <div class="batch-slot" id="batch-slot-2">
+        <input type="file" class="batch-file-input" accept="image/*" data-index="2" id="batch-input-2" />
+        <div class="batch-slot-body">
+          <div class="bs-day-tag">Day 10</div>
+          <div class="bs-thumb-wrap" id="bs-thumb-2">📅</div>
+          <div class="bs-upload-cta">Click or Drop to Upload</div>
+          <div class="bs-fname" id="bs-fname-2">No file selected</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Run batch row -->
+    <div class="batch-run-row">
+      <div class="batch-counter" id="batch-counter">Upload all 3 images to enable batch analysis</div>
+      <button class="btn btn-teal" id="batch-btn" disabled>
+        <div class="spinner" id="batch-spinner"></div>
+        <span id="batch-btn-text">📈 Run Batch Progression</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════ FULL-WIDTH: DIAGNOSTICS ══════════════ -->
+  <div class="card" id="diagnostics-section">
+    <div class="card-header">
+      <div class="card-title">
+        <div class="card-title-icon">📊</div>
+        Analysis &amp; Diagnostics
+      </div>
+    </div>
+
+    <!-- SVG defs (hidden) -->
+    <svg width="0" height="0" style="position:absolute">
+      <defs>
+        <linearGradient id="lgf" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#10b981"/>
+          <stop offset="100%" stop-color="#06b6d4"/>
+        </linearGradient>
+        <linearGradient id="gg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#10b981"/>
+          <stop offset="100%" stop-color="#06b6d4"/>
+        </linearGradient>
+        <linearGradient id="spark-fill-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#10b981" stop-opacity="0.22"/>
+          <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="spark-line-grad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#06b6d4"/>
+          <stop offset="100%" stop-color="#10b981"/>
+        </linearGradient>
+      </defs>
+    </svg>
+
+    <!-- Placeholder -->
+    <div id="placeholder-view">
+      <div class="diag-placeholder">
+        <div class="ph-anim-wrap">
+          <svg width="110" height="110" viewBox="0 0 120 120">
+            <path class="ph-leaf" d="M60,15 C85,45 95,75 80,95 C65,115 55,115 40,95 C25,75 35,45 60,15 Z M60,15 L60,95 M60,40 L80,50 M60,60 L40,70 M60,75 L75,82"/>
+          </svg>
+          <div class="ph-scan"></div>
+        </div>
+        <div class="ph-title">Diagnostic Engine Idle</div>
+        <div class="ph-sub">Upload a leaf image and press <strong>Run Single Leaf Scan</strong>, or upload 3 images and run <strong>Batch Progression</strong> above.</div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="results-view">
+      <div class="results-flow">
+
+        <!-- Hero banner -->
+        <div class="hero-banner">
+          <div>
+            <div class="hb-tag">Primary Diagnosis</div>
+            <div class="hb-name" id="res-disease">—</div>
+          </div>
+          <div class="gauge-wrap">
+            <svg class="g-svg" width="82" height="82">
+              <circle class="g-bg"   cx="41" cy="41" r="33"></circle>
+              <circle class="g-fill" id="res-ring" cx="41" cy="41" r="33" stroke-dasharray="207.35" stroke-dashoffset="207.35"></circle>
+            </svg>
+            <div class="gauge-pct" id="res-conf">—</div>
+          </div>
+        </div>
+
+        <!-- Classifier distribution -->
+        <div>
+          <div class="sec-head">📋 Classifier Distribution</div>
+          <div class="bar-list" id="top3-bars"></div>
+        </div>
+
+        <!-- Acquisition diagnostics -->
+        <div>
+          <div class="sec-head">🔬 Acquisition Diagnostics</div>
+          <div class="info-grid" id="info-grid"></div>
+          <div id="quality-wrap"></div>
+        </div>
+
+        <!-- Treatment advisory -->
+        <div>
+          <div class="sec-head">💊 Treatment Advisory</div>
+          <div id="advice-wrap"></div>
+        </div>
+
+        <!-- Spread risk -->
+        <div>
+          <div class="sec-head">⚠️ Epidemic Spread Risk</div>
+          <div id="risk-wrap"></div>
+        </div>
+
+        <!-- Batch progression (shown only after batch run) -->
+        <div id="batch-prog-wrap" style="display:none;flex-direction:column;gap:1.4rem;">
+          <div>
+            <div class="sec-head">📈 Progression Verdict</div>
+            <div id="batch-summary-wrap"></div>
+          </div>
+          <div class="sparkline-card">
+            <div class="spark-lbl">Severity Progression Index Curve</div>
+            <div class="spark-svg-wrap">
+              <svg id="sparkline-svg" width="100%" height="100%" viewBox="0 0 300 105" preserveAspectRatio="none">
+                <line x1="10" y1="18"  x2="290" y2="18"  stroke="rgba(0,0,0,0.035)" stroke-width="1"/>
+                <line x1="10" y1="54"  x2="290" y2="54"  stroke="rgba(0,0,0,0.035)" stroke-width="1"/>
+                <line x1="10" y1="88"  x2="290" y2="88"  stroke="rgba(0,0,0,0.035)" stroke-width="1"/>
+                <path id="spark-area" d="" fill="url(#spark-fill-grad)"/>
+                <path id="spark-line" d="" fill="none" stroke="url(#spark-line-grad)" stroke-width="3"/>
+                <circle id="spark-p0" cx="40"  cy="54" r="5" fill="#06b6d4" stroke="#fff" stroke-width="2"/>
+                <circle id="spark-p1" cx="150" cy="54" r="5" fill="#34d399" stroke="#fff" stroke-width="2"/>
+                <circle id="spark-p2" cx="260" cy="54" r="5" fill="#10b981" stroke="#fff" stroke-width="2"/>
+                <text x="40"  y="102" fill="#9ca3af" font-size="8" text-anchor="middle" font-family="Inter">Day 1</text>
+                <text x="150" y="102" fill="#9ca3af" font-size="8" text-anchor="middle" font-family="Inter">Day 5</text>
+                <text x="260" y="102" fill="#9ca3af" font-size="8" text-anchor="middle" font-family="Inter">Day 10</text>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="sec-head">📅 Timeline Progression Logs</div>
+            <div id="batch-timeline-wrap"></div>
+          </div>
+        </div>
+
+        <!-- Weather (always last) -->
+        <div>
+          <div class="sec-head">🌤 Meteorological Parameters</div>
+          <div class="wx-widget" id="wx-card" style="display:none;">
+            <div class="wx-head">
+              <h4>Environment Snapshot</h4>
+              <span id="wx-location"></span>
+            </div>
+            <div class="wx-tiles" id="wx-grid"></div>
+            <div class="wx-ts" id="wx-ts"></div>
+          </div>
+          <div class="wx-pending" id="wx-pending">
+            Live weather is fetched and shown once a diagnostic scan completes.
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="error-panel" style="display:none;"></div>
+  </div>
+
+</div><!-- .page -->
+
+<footer>AgroIntelli &mdash; Powered by EfficientNetB0 · Dual-Input Weather Engine · PlantVillage + PlantDoc datasets</footer>
+
+<script>
+  'use strict';
+  const API = 'http://127.0.0.1:5000';
+
+  /* ── Health ──────────────────────────────────────────────── */
+  function mkSignal(ms) {
+    if (typeof AbortSignal?.timeout === 'function') return AbortSignal.timeout(ms);
+    const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal;
+  }
+  async function checkHealth() {
+    const pill = document.getElementById('status-pill');
+    const txt  = document.getElementById('status-text');
+    try {
+      const r = await fetch(`${API}/health`, { signal: mkSignal(3500) });
+      const d = await r.json();
+      if (d.status === 'ok') {
+        txt.textContent  = d.model_loaded ? 'Model Server Online' : 'Demo Mode Active';
+        pill.className   = 'status-pill online';
+      } else throw new Error();
+    } catch {
+      txt.textContent = 'Backend Offline';
+      pill.className  = 'status-pill offline';
+    }
+  }
+  checkHealth();
+  setInterval(checkHealth, 9000);
+
+  /* ── State ───────────────────────────────────────────────── */
+  let selectedFile = null;
+  const batchFiles = [null, null, null];
+
+  /* ── Single upload zone ──────────────────────────────────── */
+  const zone      = document.getElementById('upload-zone');
+  const fileInput = document.getElementById('file-input');
+  const prevWrap  = document.getElementById('preview-wrap');
+  const prevImg   = document.getElementById('preview-img');
+
+  fileInput.addEventListener('change', e => handleSingleFile(e.target.files[0]));
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', ()  => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag-over');
+    handleSingleFile(e.dataTransfer.files[0]);
+  });
+
+  function handleSingleFile(file) {
+    if (!file?.type.startsWith('image/')) return;
+    selectedFile = file;
+    prevImg.src = URL.createObjectURL(file);
+    prevWrap.style.display = 'block';
+    zone.classList.add('compact');
+    document.getElementById('upload-status-badge').textContent = file.name.length > 18 ? file.name.slice(0,16)+'…' : file.name;
+    clearResults();
+  }
+
+  document.getElementById('remove-img').addEventListener('click', () => {
+    selectedFile = null;
+    prevWrap.style.display = 'none';
+    prevImg.src = '';
+    fileInput.value = '';
+    zone.classList.remove('compact');
+    document.getElementById('upload-status-badge').textContent = 'No image';
+    clearResults();
+  });
+
+  /* ── Batch scroll trigger ────────────────────────────────── */
+  document.getElementById('batch-scroll-btn').addEventListener('click', () => {
+    const bs = document.getElementById('batch-section');
+    bs.scrollIntoView({ behavior:'smooth', block:'start' });
+    bs.style.outline = '2px solid var(--green)';
+    bs.style.outlineOffset = '3px';
+    setTimeout(() => { bs.style.outline = 'none'; bs.style.outlineOffset = 'unset'; }, 900);
+  });
+
+  /* ── Mode cards ──────────────────────────────────────────── */
+  document.getElementById('card-field').addEventListener('click', () => {
+    document.getElementById('card-field').classList.add('active');
+    document.getElementById('card-lab').classList.remove('active');
+    document.getElementById('mode-field').checked = true;
+    clearResults();
+  });
+  document.getElementById('card-lab').addEventListener('click', () => {
+    document.getElementById('card-lab').classList.add('active');
+    document.getElementById('card-field').classList.remove('active');
+    document.getElementById('mode-lab').checked = true;
+    clearResults();
+  });
+
+  /* ── Batch slots ─────────────────────────────────────────── */
+  document.querySelectorAll('.batch-file-input').forEach(inp => {
+    inp.addEventListener('change', e => {
+      handleBatchFile(Number(e.target.dataset.index), e.target.files[0]);
+    });
+  });
+
+  // Drag-and-drop for each batch slot
+  document.querySelectorAll('.batch-slot').forEach(slot => {
+    slot.addEventListener('dragover', e => { e.preventDefault(); slot.classList.add('drag-over'); });
+    slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+    slot.addEventListener('drop', e => {
+      e.preventDefault(); slot.classList.remove('drag-over');
+      const idx = Number(slot.id.replace('batch-slot-', ''));
+      handleBatchFile(idx, e.dataTransfer.files[0]);
+    });
+  });
+
+  function handleBatchFile(idx, file) {
+    if (!file?.type.startsWith('image/')) return;
+    batchFiles[idx] = file;
+
+    // Update filename
+    document.getElementById(`bs-fname-${idx}`).textContent = file.name.length > 20 ? file.name.slice(0,18)+'…' : file.name;
+
+    // Show thumbnail in slot
+    const thumbWrap = document.getElementById(`bs-thumb-${idx}`);
+    thumbWrap.innerHTML = '';
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:8px;';
+    thumbWrap.appendChild(img);
+
+    // Mark slot as filled
+    document.getElementById(`batch-slot-${idx}`).classList.add('has-file');
+
+    // Update step dots
+    updateStepIndicator();
+    updateBatchCounter();
+    clearResults();
+  }
+
+  function removeBatchFile(idx) {
+    batchFiles[idx] = null;
+    document.getElementById(`bs-fname-${idx}`).textContent = 'No file selected';
+    document.getElementById(`bs-thumb-${idx}`).innerHTML = '📅';
+    document.getElementById(`batch-slot-${idx}`).classList.remove('has-file');
+    document.getElementById(`batch-input-${idx}`).value = '';
+    updateStepIndicator();
+    updateBatchCounter();
+    clearResults();
+  }
+
+  function updateStepIndicator() {
+    batchFiles.forEach((f, i) => {
+      const dot  = document.getElementById(`step-dot-${i}`);
+      if (dot) { dot.classList.toggle('filled', !!f); }
+      if (i < 2) {
+        const line = document.getElementById(`step-line-${i}`);
+        if (line) line.classList.toggle('filled', !!batchFiles[i] && !!batchFiles[i+1]);
+      }
+    });
+    document.getElementById('batch-btn').disabled = batchFiles.some(f => !f);
+  }
+
+  function updateBatchCounter() {
+    const n = batchFiles.filter(Boolean).length;
+    document.getElementById('batch-count-badge').textContent = `${n} / 3 uploaded`;
+    document.getElementById('batch-counter').innerHTML =
+      n === 3
+        ? '<strong style="color:var(--green-xdark);">✅ All 3 images ready — run the analysis!</strong>'
+        : `Upload <strong>${3-n}</strong> more image${3-n>1?'s':''} to enable batch analysis`;
+  }
+
+  // Allow clicking on a filled slot to remove the file
+  document.querySelectorAll('.batch-slot').forEach(slot => {
+    slot.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      const idx = Number(slot.id.replace('batch-slot-',''));
+      if (batchFiles[idx]) removeBatchFile(idx);
+    });
+  });
+
+  /* ── Single Leaf Scan ────────────────────────────────────── */
+  document.getElementById('predict-btn').addEventListener('click', async () => {
+    if (!selectedFile) {
+      zone.classList.add('shake'); setTimeout(() => zone.classList.remove('shake'), 450);
+      fileInput.click(); return;
+    }
+    const mode       = document.querySelector('input[name="mode"]:checked').value;
+    const useWeather = document.getElementById('use-weather').checked;
+    setLoading(true); clearResults();
+    document.getElementById('diagnostics-section').scrollIntoView({ behavior:'smooth', block:'start' });
+
+    const fd = new FormData();
+    fd.append('image', selectedFile); fd.append('mode', mode);
+    fd.append('use_weather', useWeather ? 'true' : 'false');
+
+    try {
+      const r = await fetch(`${API}/predict`, { method:'POST', body:fd });
+      if (!r.ok) { const e = await r.json(); showError(e.error||'Server error.'); return; }
+      const data = await r.json();
+      renderResults(data);
+      if (data.weather) renderWeather(data.weather);
+    } catch { showError('Cannot reach Flask service. Verify app.py is running on port 5000.'); }
+    finally  { setLoading(false); }
+  });
+
+  /* ── Batch Progression ───────────────────────────────────── */
+  document.getElementById('batch-btn').addEventListener('click', async () => {
+    if (batchFiles.some(f => !f)) {
+      batchFiles.forEach((f, idx) => {
+        if (!f) {
+          const s = document.getElementById(`batch-slot-${idx}`);
+          s.classList.add('shake'); setTimeout(() => s.classList.remove('shake'), 450);
+        }
+      });
+      return;
+    }
+    const mode       = document.querySelector('input[name="mode"]:checked').value;
+    const useWeather = document.getElementById('use-weather').checked;
+    setLoadingBatch(true); clearResults();
+    document.getElementById('diagnostics-section').scrollIntoView({ behavior:'smooth', block:'start' });
+
+    const fd = new FormData();
+    batchFiles.forEach(f => fd.append('images', f));
+    fd.append('labels', JSON.stringify(['Day 1','Day 5','Day 10']));
+    fd.append('mode', mode);
+    fd.append('use_weather', useWeather ? 'true' : 'false');
+
+    try {
+      const r = await fetch(`${API}/batch_predict`, { method:'POST', body:fd });
+      if (!r.ok) { const e = await r.json(); showError(e.error||'Batch pipeline failed.'); return; }
+      const data = await r.json();
+      renderBatchResults(data);
+      if (data.weather) renderWeather(data.weather);
+    } catch { showError('Cannot reach Flask service. Verify app.py is running on port 5000.'); }
+    finally  { setLoadingBatch(false); }
+  });
+
+  /* ── Render Single Results ───────────────────────────────── */
+  function renderResults(d) {
+    $show('results-view'); $hide('placeholder-view');
+    document.getElementById('batch-prog-wrap').style.display = 'none';
+
+    const title = d.prediction.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    document.getElementById('res-disease').textContent = title;
+
+    const pct = d.confidence_pct;
+    document.getElementById('res-conf').textContent = pct.toFixed(1)+'%';
+    const ring = document.getElementById('res-ring');
+    const P = 207.35;
+    ring.style.strokeDashoffset = P - (P * pct / 100);
+    ring.setAttribute('stroke', pct>=85 ? 'url(#gg)' : pct>=55 ? 'var(--amber)' : 'var(--red)');
+
+    // Top-3 bars
+    const bEl = document.getElementById('top3-bars'); bEl.innerHTML = '';
+    (d.top3||[]).forEach(([cls,prob]) => {
+      const p = (prob*100).toFixed(1);
+      bEl.innerHTML += `<div class="bar-item">
+        <div class="bar-label"><span class="bar-cn">${cls.replace(/_/g,' ')}</span><span class="bar-pv">${p}%</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${p}%"></div></div>
+      </div>`;
+    });
+
+    // Info grid
+    const q = d.quality||{}, sev = d.severity||{};
+    let sc = 'var(--green)';
+    if (sev.severity?.includes('severe')) sc = 'var(--red)';
+    else if (sev.severity?.includes('early')||sev.severity?.includes('moderate')) sc = 'var(--amber)';
+    document.getElementById('info-grid').innerHTML = `
+      <div class="info-box"><div class="ib-l">Analysis Pipeline</div><div class="ib-v" style="color:var(--green)">${d.mode==='field'?'🌾 Field Engine':'🔬 Lab Engine'}</div></div>
+      <div class="info-box"><div class="ib-l">Severity Index</div><div class="ib-v" style="color:${sc}">${sev.severity||'—'}</div></div>
+      <div class="info-box"><div class="ib-l">Lesion Area Ratio</div><div class="ib-v">${sev.lesion_ratio!=null?(sev.lesion_ratio*100).toFixed(1)+'%':'—'}</div></div>
+      <div class="info-box"><div class="ib-l">Sharpness Value</div><div class="ib-v">${q.sharpness!=null?q.sharpness.toFixed(0)+' px':'—'}</div></div>`;
+
+    // Advice
+    document.getElementById('advice-wrap').innerHTML = d.advice
+      ? `<div class="care-box"><div class="care-tag">Treatment protocol &amp; safety actions</div><p>${d.advice}</p></div>`
+      : `<div class="care-box" style="border-color:var(--text-4);background:none;"><p>No actionable care plan generated. Monitor crop weekly.</p></div>`;
+
+    // Risk
+    const sr = d.spread_risk;
+    document.getElementById('risk-wrap').innerHTML = sr
+      ? `<div class="risk-box"><div class="risk-head"><span class="risk-badge risk-${sr.level||'LOW'}">${sr.level||'LOW'} spreading risk</span><span class="risk-score">Epidemic Index: ${(sr.score*100).toFixed(0)}%</span></div><p class="risk-desc">${sr.explanation}</p></div>`
+      : `<div style="font-size:0.78rem;color:var(--text-3);font-style:italic;padding:0.4rem;">Enable the weather switch to calculate spread indexes.</div>`;
+
+    // Quality + demo
+    let qHtml = '';
+    if (q.warnings?.length) qHtml += `<div class="warn-box"><span>⚠️</span><div><p><strong>Camera warnings:</strong> ${q.warnings.join(', ')}.</p><p style="font-size:0.72rem;color:var(--text-3);margin-top:2px;">Re-acquire in neutral ambient light.</p></div></div>`;
+    if (d.demo_mode) qHtml += `<div class="demo-box"><span>ℹ️</span><div><p><strong>Mock prediction loaded</strong></p><p style="font-size:0.72rem;color:var(--text-3);margin-top:2px;">Model weights not found — running fallback demo.</p></div></div>`;
+    document.getElementById('quality-wrap').innerHTML = qHtml;
+  }
+
+  /* ── Render Batch Results ────────────────────────────────── */
+  function renderBatchResults(d) {
+    $show('results-view'); $hide('placeholder-view');
+    document.getElementById('batch-prog-wrap').style.display = 'flex';
+
+    const summary = d.summary||{}, items = d.items||[];
+    const trend   = (summary.trend||'stable').toUpperCase();
+    const delta   = Number(summary.delta||0);
+    const arrow   = delta>0.08 ? '↗ WORSENING' : delta<-0.08 ? '↘ IMPROVING' : '→ STABLE';
+    const wNote   = d.weather_note?.note||(d.weather?'Weather forecast factored.':'Weather was omitted.');
+
+    document.getElementById('res-disease').textContent = 'Batch timeline evaluated';
+    document.getElementById('res-conf').textContent = trend.split(' ')[0];
+    const ring = document.getElementById('res-ring');
+    ring.style.strokeDashoffset = 0;
+    ring.setAttribute('stroke', trend.includes('WORSENING')?'var(--red)':trend.includes('IMPROVING')?'var(--green)':'var(--amber)');
+
+    document.getElementById('top3-bars').innerHTML = `<div style="font-size:0.78rem;color:var(--text-3);text-align:center;padding:0.5rem 0;">Timeline probabilities compiled in the progression stepper below.</div>`;
+    document.getElementById('info-grid').innerHTML  = `<div class="info-box" style="grid-column:1/-1"><div class="ib-l">Timeline Scope</div><div class="ib-v">${items.length} Chronological Samples (Day 1 → Day 10)</div></div>`;
+    document.getElementById('advice-wrap').innerHTML = `<div class="care-box" style="border-color:${trend.includes('WORSENING')?'var(--red)':'var(--green)'}"><div class="care-tag">Timeline verdict: ${trend}</div><p>${summary.explanation||''}</p><div style="font-size:0.7rem;color:var(--text-4);margin-top:0.35rem;">${wNote}</div></div>`;
+    document.getElementById('risk-wrap').innerHTML = '';
+
+    document.getElementById('batch-summary-wrap').innerHTML = `<div class="prog-card" style="border-color:${trend.includes('WORSENING')?'var(--red)':trend.includes('IMPROVING')?'var(--green)':'var(--amber)'}"><div class="prog-title">Overall trajectory: ${arrow}</div><p class="prog-desc">${summary.explanation||''}</p><p class="prog-note">${wNote}</p></div>`;
+
+    document.getElementById('batch-timeline-wrap').innerHTML = `<div class="tl-list">
+      ${items.map((item,idx) => {
+        const r = item.result||{}, sev = r.severity||{}, risk = r.spread_risk||{};
+        let dH = '';
+        if (item.delta_from_previous==null) dH=`<span class="delta delta-st">Baseline</span>`;
+        else if (item.delta_from_previous>0.02)  dH=`<span class="delta delta-up">▲ +${(item.delta_from_previous*100).toFixed(1)}%</span>`;
+        else if (item.delta_from_previous<-0.02) dH=`<span class="delta delta-dn">▼ ${(item.delta_from_previous*100).toFixed(1)}%</span>`;
+        else dH=`<span class="delta delta-st">● Stable</span>`;
+        const src = batchFiles[idx] ? URL.createObjectURL(batchFiles[idx]) : '';
+        const imgH = src ? `<img class="tl-thumb" src="${src}"/>` : '📅';
+        return `<div class="tl-card ${idx===items.length-1?'active':''}">
+          <div class="tl-head"><div class="tl-day">${imgH}<span>${item.label} (${item.filename||'item'})</span></div>${dH}</div>
+          <div class="tl-body">
+            <div><span class="tl-sl">AI Diagnosis</span><span class="tl-sv" style="text-transform:capitalize;">${String(r.prediction||'—').replace(/_/g,' ')}</span></div>
+            <div><span class="tl-sl">Confidence</span><span class="tl-sv">${Number(r.confidence_pct||0).toFixed(1)}%</span></div>
+            <div><span class="tl-sl">Severity Index</span><span class="tl-sv">${sev.severity||'—'} (${(item.severity_score||0).toFixed(3)})</span></div>
+            <div><span class="tl-sl">Epidemic Spread</span><span class="tl-sv">${risk.level||'—'} (${((risk.score||0)*100).toFixed(0)}%)</span></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+    // Sparkline
+    const scores = items.map(it=>it.severity_score||0);
+    const xs=[40,150,260], ys=scores.map(s=>86-(Math.min(Math.max(s,0),1)*64));
+    const lp=`M${xs[0]} ${ys[0]} L${xs[1]} ${ys[1]} L${xs[2]} ${ys[2]}`;
+    document.getElementById('spark-line').setAttribute('d',lp);
+    document.getElementById('spark-area').setAttribute('d',`${lp} L${xs[2]} 86 L${xs[0]} 86 Z`);
+    xs.forEach((x,i)=>{
+      const c=document.getElementById(`spark-p${i}`);
+      if(c){ c.setAttribute('cx',x); c.setAttribute('cy',ys[i]);
+        c.setAttribute('fill',scores[i]>=0.22?'var(--red)':scores[i]>=0.08?'var(--amber)':'var(--green)'); }
+    });
+  }
+
+  /* ── Weather ─────────────────────────────────────────────── */
+  function renderWeather(w) {
+    document.getElementById('wx-card').style.display = 'block';
+    document.getElementById('wx-pending').style.display = 'none';
+    document.getElementById('wx-location').textContent = `— ${w.city}, ${w.country}`;
+    let em='⛅'; const c=w.condition.toLowerCase();
+    if(c.includes('rain')||c.includes('drizzle')) em='🌧️';
+    else if(c.includes('clear')||c.includes('sun')) em='☀️';
+    else if(c.includes('snow')) em='❄️';
+    else if(c.includes('thunder')) em='⛈️';
+    else if(c.includes('wind')||c.includes('storm')) em='💨';
+    document.getElementById('wx-grid').innerHTML=`
+      <div class="wx-tile"><div class="wi">🌡️</div><div class="wv">${w.temp_c}°C</div><div class="wl">Temp</div></div>
+      <div class="wx-tile"><div class="wi">💧</div><div class="wv">${w.humidity_pct}%</div><div class="wl">Humidity</div></div>
+      <div class="wx-tile"><div class="wi">${em}</div><div class="wv" style="font-size:0.72rem;text-transform:capitalize;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${w.condition}</div><div class="wl">Condition</div></div>
+      <div class="wx-tile"><div class="wi">💨</div><div class="wv">${w.wind_kmh} kph</div><div class="wl">Wind</div></div>
+      <div class="wx-tile"><div class="wi">🌧️</div><div class="wv">${w.rain_1h_mm}mm</div><div class="wl">Rain/hr</div></div>`;
+    document.getElementById('wx-ts').textContent = `Station data fetched at ${w.fetched_at}`;
+  }
+
+  /* ── Loading helpers ─────────────────────────────────────── */
+  function setLoading(on) {
+    document.getElementById('predict-btn').disabled = on;
+    document.getElementById('spinner').style.display = on ? 'block' : 'none';
+    document.getElementById('btn-text').textContent  = on ? 'Analysing…' : '🔍 Run Single Leaf Scan';
+  }
+  function setLoadingBatch(on) {
+    document.getElementById('batch-btn').disabled = on || batchFiles.some(f=>!f);
+    document.getElementById('batch-spinner').style.display = on ? 'block' : 'none';
+    document.getElementById('batch-btn-text').textContent  = on ? 'Analysing timeline…' : '📈 Run Batch Progression';
+  }
+  function clearResults() {
+    $hide('results-view'); $show('placeholder-view'); $hide('error-panel');
+    document.getElementById('wx-card').style.display='none';
+    document.getElementById('wx-pending').style.display='block';
+    document.getElementById('batch-prog-wrap').style.display='none';
+    ['top3-bars','info-grid','advice-wrap','risk-wrap','quality-wrap','batch-summary-wrap','batch-timeline-wrap']
+      .forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=''; });
+  }
+  function showError(msg) {
+    $hide('placeholder-view'); $hide('results-view'); $show('error-panel');
+    document.getElementById('error-panel').innerHTML=`
+      <div class="err-box">
+        <span>❌</span>
+        <div><strong style="display:block;margin-bottom:2px;">Diagnostic Interrupted</strong><span>${msg}</span></div>
+      </div>`;
+  }
+  function $show(id) { const el=document.getElementById(id); if(el) el.style.display='block'; }
+  function $hide(id) { const el=document.getElementById(id); if(el) el.style.display='none'; }
+</script>
+</body>
+</html>

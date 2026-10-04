@@ -1,0 +1,9 @@
+{
+  "corn_common_rust": 0,
+  "potato_early_blight": 1,
+  "potato_healthy": 2,
+  "potato_late_blight": 3,
+  "tomato_early_blight": 4,
+  "tomato_healthy": 5,
+  "tomato_late_blight": 6
+}

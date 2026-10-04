@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Build / packaging
+dist/
+build/
+*.egg-info/
+*.zip
+
+# Generated project artifacts
+agrointelli_data/
+backend/models/*.keras
+backend/models/*.h5
+backend/models/*.hdf5
+backend/models/*.savedmodel/
+backend/models/*.pb
+backend/models/*.json
+!backend/models/.gitkeep
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
