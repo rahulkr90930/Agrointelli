@@ -21,16 +21,21 @@ Built as a final-year engineering capstone project, AgroIntelli empowers farmers
    - Generates pixel-level Class Activation Maps (Grad-CAM) showing exact leaf regions driving the diagnostic prediction.
    - Computes quantitative **% Leaf Area Affected** via Otsu adaptive thresholding on saliency gradients.
 
-4. **Temporal Progression & Re-check Engine**:
+4. **Dynamic Batch Progression Analysis**:
+   - Upload 3 sequential leaf images across any custom timeline.
+   - **User-Defined Days**: Customize the day values directly (e.g., Day 1, Day 4, Day 12) rather than hardcoded intervals.
+   - Computes disease velocity, trajectory trend (`IMPROVING`, `WORSENING`, `STABLE`), and net severity change ($\Delta$).
+
+5. **Temporal Progression & Re-check Engine**:
    - Track individual plant leaves over time (Day 1 ➔ Day 3 ➔ Day 7).
    - Direct side-by-side visual comparison showing Day 1 baseline vs latest scan.
    - Dual Grad-CAM comparison showing whether lesions contracted or expanded.
-   - Calculates **Daily Spread Velocity (% spread / day)** and net severity delta ($\Delta$).
+   - **Smart Date & Stage Handling**: Displays the previous day and date the leaf was analyzed; automatically defaults to **Today's Date** for the follow-up, while letting the user freely modify both the date and the day label.
    - **Weather-Correlated Progression Intelligence**: Evaluates consecutive rain and elevated humidity ($\ge 75\%$), correlating persistent leaf surface moisture with accelerated fungal spore germination (*Phytophthora infestans*, powdery mildew, early blight).
 
-5. **Cloud Persistence with MongoDB & Guest Mode**:
+6. **Cloud Persistence with MongoDB & Guest Mode**:
    - Secure farmer authentication (Sign In / Sign Up) + zero-barrier Guest Mode.
-   - Records every inspection with `day_number`, timestamp, weather telemetry, Grad-CAM overlays, and compressed thumbnail images.
+   - Records every inspection with `day_number`, date, timestamp, weather telemetry, Grad-CAM overlays, and compressed thumbnail images.
    - Full timeline history expandable per plant sample.
 
 ---
@@ -38,7 +43,7 @@ Built as a final-year engineering capstone project, AgroIntelli empowers farmers
 ## 📁 Repository Structure
 
 ```text
-AgroIntelli_Project/
+AgroIntelli/
 ├── backend/
 │   ├── app.py                     # Flask REST API (Inference, MongoDB, Weather, Grad-CAM)
 │   └── models/                    # Model weights & label mappings (.gitkeep)
@@ -70,54 +75,131 @@ The machine learning workflow is structured cleanly into three sequentially exec
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quickstart: How to Load from GitHub and Run
 
-### 1. Environment Setup
+Follow these step-by-step instructions to clone the repository from GitHub, set up your Python environment, and start the application.
 
-Ensure you have **Python 3.10** or **3.11** installed. Clone the repository and install dependencies:
+### 1. Clone the Repository from GitHub
+
+Open your terminal or PowerShell and clone the official repository:
 
 ```bash
-cd AgroIntelli_Project
-python -m venv venv
-# Windows:
-.\venv\Scripts\activate
-# Linux/macOS:
-source venv/bin/activate
+git clone https://github.com/rahulkr90930/Agrointelli.git
+cd Agrointelli
+```
 
+Make sure you are on the `v2` branch:
+
+```bash
+git checkout v2
+```
+
+---
+
+### 2. Set Up Python Virtual Environment
+
+Make sure you have **Python 3.10** or **3.11** installed.
+
+#### On Windows (PowerShell or Command Prompt):
+```powershell
+python -m venv venv
+.\venv\Scripts\activate
+```
+
+#### On macOS / Linux:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+---
+
+### 3. Install Dependencies
+
+Install the required packages using `pip`:
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configuration (`.env`)
+---
 
-Copy `.env.example` to `.env` and provide your credentials:
+### 4. Configure Environment Variables (`.env`)
 
+Copy the provided template to create your `.env` file:
+
+#### On Windows (PowerShell):
+```powershell
+Copy-Item .env.example .env
+```
+
+#### On Linux / macOS:
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env`:
+Open `.env` in any text editor and fill in your credentials:
+
 ```env
 # MongoDB Atlas Connection
-MONGO_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/?appName=Cluster0
+MONGO_URI=mongodb+srv://<username>:<password>@cluster0.c5skeva.mongodb.net/?appName=Cluster0
 MONGO_DB_NAME=agrointelli
 
-# OpenWeatherMap API Key
+# OpenWeatherMap API Key (Free tier supported)
 OWM_API_KEY=your_openweathermap_api_key_here
 
-# Flask Configuration
+# Server Configuration
 PORT=5000
 FLASK_DEBUG=False
 ```
 
-### 3. Launching the Application
+> **Note**: If MongoDB is not configured or offline, AgroIntelli automatically falls back to an encrypted local JSON store (`backend/data_store.json`), so all features remain functional even without internet!
 
-Run the unified cross-platform launcher:
+---
+
+### 5. Run the Application
+
+Start both the backend server and open the web frontend with one command:
 
 ```bash
 python run.py
 ```
 
-This starts the Flask backend on `http://127.0.0.1:5000` and automatically launches your browser to `frontend/index.html`.
+- The script starts the Flask REST API on `http://127.0.0.1:5000`.
+- It will automatically launch `frontend/index.html` in your default web browser.
+
+#### Manual Startup (Alternative):
+If you prefer running the components separately:
+
+1. **Start Backend**:
+   ```bash
+   python backend/app.py
+   ```
+2. **Open Frontend**:
+   Double click `frontend/index.html` or open it in your browser.
+
+---
+
+## 📖 How to Use the Key Features
+
+### 1. AI Model Selection
+- On the main dashboard, choose between **⚡ MobileNetV3** (fastest edge inference) and **🎯 EfficientNet-B0** (deepest convolutional representation).
+- Your choice will be reflected in the real-time diagnostic badge.
+
+### 2. Custom Batch Progression Analysis
+- Click the **Batch Progression** card at the top.
+- For each of the 3 timeline slots, enter your own custom day numbers in the **Day** input (e.g., Sample 1: `Day 1`, Sample 2: `Day 4`, Sample 3: `Day 12`).
+- Drop or select leaf photos for each slot.
+- Click **📈 Run Batch Progression** to view the trajectory curve, spread velocity per day, and weather risk notes.
+
+### 3. "Check on Past Disease" & Smart Leaf Re-Check
+- After running a single leaf scan, click **💾 Save Leaf to Journal** at the bottom to store it in MongoDB.
+- Click **🔍 Check on Past Disease** in the top navigation bar to open your tracked leaf records.
+- Click **🔬 Re-check this Leaf**:
+  - The modal automatically displays the **Previous Analysis Date & Day**.
+  - The **Analysis Date** is pre-filled with **Today's Date** by default, and the next day number is automatically calculated based on elapsed days.
+  - You can edit both the date and the day label if desired.
+  - Upload the latest photo and click **🔬 Run Comparative Analysis** to view side-by-side leaf images, dual Grad-CAM heatmaps, daily spread velocity, and weather correlation.
 
 ---
 
@@ -140,13 +222,14 @@ Returns backend status, loaded model architectures, and database connectivity.
 ### Batch Progression Analysis
 `POST /batch_predict`
 - **Body (`multipart/form-data`)**:
-  - `images`: Array of 3 sequential images (Day 1, Day 5, Day 10).
+  - `images`: Array of 3 sequential images.
+  - `labels`: JSON array of custom labels, e.g. `["Day 1", "Day 4", "Day 12"]`.
   - `architecture`: `mobilenet` or `efficientnet`.
   - `field_mode`: `true` or `false`.
-  - `weather`: `true` or `false`.
+  - `use_weather`: `true` or `false`.
 - **Returns**: Progression trend (`IMPROVING`, `WORSENING`, `STABLE`), progression rate per day, comparative delta ($\Delta$), and combined weather progression risk notes.
 
 ### Leaf Journal & Re-check
-- `POST /journal/save` — Persist a leaf scan with `plant_name`, `day_number`, `date`, `weather`, and image thumbnail.
-- `GET /journal/list?user_id=<id>` — Fetch all tracked leaves for a user/guest.
-- `POST /journal/recheck` — Submit a follow-up photo for an existing tracked leaf. Returns side-by-side images, dual Grad-CAM heatmaps, elapsed days, daily spread rate, and weather-correlated spread rationale.
+- `POST /api/records/save` — Persist a leaf scan with `plant_name`, `day_number`, `date`, `weather`, and image thumbnail.
+- `GET /api/records?user_id=<id>` — Fetch all tracked leaves for a user/guest.
+- `POST /api/records/<record_id>/checkin` — Submit a follow-up photo for an existing tracked leaf with custom `date` and `day_label`. Returns side-by-side images, dual Grad-CAM heatmaps, elapsed days, daily spread rate, and weather-correlated spread rationale.

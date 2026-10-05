@@ -177,9 +177,10 @@ class StorageManager:
         record["updated_at"] = datetime.now().isoformat()
         if self.is_mongo:
             try:
+                doc_to_save = {k: v for k, v in record.items() if k != "_id"}
                 self.db.leaf_records.update_one(
                     {"record_id": record["record_id"]},
-                    {"$set": record},
+                    {"$set": doc_to_save},
                     upsert=True
                 )
                 print(f"🍃 [MongoDB] Successfully saved leaf record: {record['record_id']} ({record.get('plant_name')})")
@@ -1322,6 +1323,11 @@ def recheck_leaf(record_id):
         return jsonify({"error": "Could not decode uploaded photo."}), 400
 
     day_label = request.form.get("day_label", "Follow-up Scan").strip()
+    custom_date = request.form.get("date", "").strip()
+    if not custom_date:
+        custom_date = datetime.now().strftime("%Y-%m-%d")
+    now_str = f"{custom_date} {datetime.now().strftime('%H:%M')}"
+
     notes = request.form.get("notes", "").strip()
     use_weather = request.form.get("use_weather", "false").lower() == "true"
     mode = request.form.get("mode", "field") == "field"
@@ -1343,7 +1349,6 @@ def recheck_leaf(record_id):
     new_pred = diag.get("prediction", "Unknown")
     new_aff = float(diag.get("gradcam", {}).get("affected_pct", 0.0))
     new_sev = diag.get("gradcam", {}).get("category", "Unknown")
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     prev_pred = prev_entry.get("prediction", new_pred) if prev_entry else new_pred
     prev_aff  = float(prev_entry.get("affected_pct", new_aff)) if prev_entry else new_aff
@@ -1351,9 +1356,30 @@ def recheck_leaf(record_id):
     # Parse day numbers
     prev_day_num = parse_day_num(prev_entry.get("day_label", "Day 1")) if prev_entry else 1
     curr_day_num = parse_day_num(day_label)
+
+    # Compute calendar day difference if available
+    date_diff = None
+    if prev_entry:
+        prev_date_str = prev_entry.get("date") or (prev_entry.get("timestamp", "").split(" ")[0] if prev_entry.get("timestamp") else None)
+        if prev_date_str and custom_date:
+            try:
+                d_prev = datetime.strptime(prev_date_str[:10], "%Y-%m-%d")
+                d_curr = datetime.strptime(custom_date[:10], "%Y-%m-%d")
+                diff = (d_curr - d_prev).days
+                if diff > 0:
+                    date_diff = diff
+            except Exception:
+                pass
+
     if curr_day_num is None:
-        curr_day_num = (prev_day_num or 1) + 7
-    days_elapsed = max(curr_day_num - (prev_day_num or 1), 1)
+        curr_day_num = (prev_day_num or 1) + (date_diff if date_diff else 7)
+
+    if curr_day_num and prev_day_num and (curr_day_num > prev_day_num):
+        days_elapsed = curr_day_num - prev_day_num
+    elif date_diff is not None and date_diff > 0:
+        days_elapsed = date_diff
+    else:
+        days_elapsed = max(curr_day_num - (prev_day_num or 1), 1) if curr_day_num else 1
 
     # Weather & temporal epidemiological progression evaluation
     prev_weather = prev_entry.get("weather") if prev_entry else None
@@ -1379,7 +1405,7 @@ def recheck_leaf(record_id):
         "day_number": curr_day_num,
         "day_label": day_label,
         "days_elapsed": days_elapsed,
-        "date": datetime.now().strftime("%Y-%m-%d"),
+        "date": custom_date,
         "timestamp": now_str,
         "prediction": new_pred,
         "confidence": diag.get("confidence", 0.0),
