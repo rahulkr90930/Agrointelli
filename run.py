@@ -24,13 +24,19 @@ if sys.platform.startswith('win'):
 def start_backend():
     print("🌿 Starting AgroIntelli Backend Server...")
     
-    # Resolve the correct Python interpreter
-    # Look for virtual environment first, fallback to standard python executable
-    venv_python = os.path.join("venv", "Scripts", "python.exe")
-    if not os.path.exists(venv_python):
-        venv_python = os.path.join(".venv", "Scripts", "python.exe")
-    if not os.path.exists(venv_python):
-        venv_python = sys.executable
+    # Resolve the correct Python interpreter (Windows or Linux/Codespaces)
+    candidates = [
+        os.path.join("venv", "Scripts", "python.exe"),
+        os.path.join(".venv", "Scripts", "python.exe"),
+        os.path.join("venv", "bin", "python"),
+        os.path.join(".venv", "bin", "python"),
+        sys.executable
+    ]
+    venv_python = sys.executable
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            venv_python = candidate
+            break
         
     print(f"🚀 Using Python: {venv_python}")
     
@@ -67,11 +73,19 @@ def open_frontend():
             pass
         time.sleep(0.5)
     
+    # In GitHub Codespaces or headless environments
+    if os.environ.get("CODESPACES") == "true":
+        print("🌐 AgroIntelli is running inside GitHub Codespaces! Open port 5000 to view the app.")
+        return
+
     frontend_path = os.path.abspath(os.path.join("frontend", "index.html"))
     if os.path.exists(frontend_path):
         browser_url = f"file:///{frontend_path.replace(os.sep, '/')}"
         print(f"🌐 Backend is live! Opening frontend in your browser: {browser_url}")
-        webbrowser.open(browser_url)
+        try:
+            webbrowser.open(browser_url)
+        except Exception:
+            pass
     else:
         print(f"⚠ Warning: Could not find frontend at {frontend_path}")
 

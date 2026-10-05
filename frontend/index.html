@@ -1612,7 +1612,7 @@
 
 <script>
   'use strict';
-  const API = 'http://127.0.0.1:5000';
+  const API = (window.location.protocol.startsWith('http')) ? window.location.origin : 'http://127.0.0.1:5000';
 
   /* ── Health ──────────────────────────────────────────────── */
   function mkSignal(ms) {

@@ -60,6 +60,12 @@ load_model()
 
 @app.route("/", methods=["GET"])
 def home():
+    # If opened by a web browser, serve the interactive AgroIntelli web application
+    if "text/html" in request.headers.get("Accept", ""):
+        frontend_file = Path(__file__).parent.parent / "frontend" / "index.html"
+        if frontend_file.exists():
+            from flask import send_file
+            return send_file(str(frontend_file))
     return jsonify({
         "name": "AgroIntelli Modular API",
         "status": "online",
@@ -67,6 +73,13 @@ def home():
         "models_available": list(available_models.keys()),
         "mongo_connected": db_store.is_mongo
     })
+
+
+@app.route("/app", methods=["GET"])
+def web_app():
+    frontend_file = Path(__file__).parent.parent / "frontend" / "index.html"
+    from flask import send_file
+    return send_file(str(frontend_file))
 
 
 @app.route("/health", methods=["GET"])
