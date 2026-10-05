@@ -3060,6 +3060,73 @@
     cursor: not-allowed;
     transform: none;
   }
+  .agro-chat-mic-btn {
+    background: #f0fdf4 !important;
+    color: #047857 !important;
+    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+    box-shadow: none !important;
+    font-size: 1.1rem;
+    transition: all 0.2s !important;
+  }
+  .agro-chat-mic-btn:hover {
+    background: #dcfce7 !important;
+    transform: scale(1.05) !important;
+  }
+  .agro-chat-mic-btn.agro-mic-recording {
+    background: #fee2e2 !important;
+    color: #dc2626 !important;
+    border-color: #ef4444 !important;
+    animation: agroMicPulse 1s infinite alternate;
+  }
+  @keyframes agroMicPulse {
+    from { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+    to { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  }
+
+  /* Language Selector */
+  .agro-chat-lang-select {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 6px;
+    border-radius: 8px;
+    outline: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .agro-chat-lang-select option {
+    background: #064e3b;
+    color: #ffffff;
+  }
+
+  /* Listen / TTS button on message */
+  .agro-listen-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #f0fdf4;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    color: #047857;
+    font-size: 0.70rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 999px;
+    margin-top: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .agro-listen-btn:hover {
+    background: #dcfce7;
+    transform: translateY(-1px);
+  }
+  .agro-listen-btn.agro-speaking {
+    background: #fee2e2;
+    color: #dc2626;
+    border-color: #f87171;
+  }
 
   @media (max-width: 600px) {
     .agro-chat-window {
@@ -3096,10 +3163,22 @@
           AgroBot AI
           <span class="agro-online-dot" title="Online & Telemetry Grounded"></span>
         </div>
-        <div class="agro-chat-header-sub">Gemini & AgroIntelli Pathology Grounded</div>
+        <div class="agro-chat-header-sub">Gemini Multilingual Agricultural Voice Assistant</div>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:6px;">
+      <!-- Language Picker -->
+      <select id="agro-chat-lang" class="agro-chat-lang-select" title="Choose Voice & Output Language">
+        <option value="Hindi" data-code="hi-IN" selected>🇮🇳 हिन्दी</option>
+        <option value="English" data-code="en-US">🇬🇧 English</option>
+        <option value="Spanish" data-code="es-ES">🇪🇸 Español</option>
+        <option value="Bengali" data-code="bn-IN">🇮🇳 বাংলা</option>
+        <option value="Marathi" data-code="mr-IN">🇮🇳 मराठी</option>
+        <option value="Punjabi" data-code="pa-IN">🇮🇳 ਪੰਜਾਬੀ</option>
+        <option value="Tamil" data-code="ta-IN">🇮🇳 தமிழ்</option>
+        <option value="Telugu" data-code="te-IN">🇮🇳 తెలుగు</option>
+      </select>
+      <button id="agro-chat-tts-toggle" class="agro-chat-btn-icon" title="Toggle Auto Voice Readout">🔊</button>
       <button id="agro-chat-clear" class="agro-chat-btn-icon" title="Reset Session">🗑️</button>
       <button id="agro-chat-close" class="agro-chat-btn-icon" title="Close Chat">✕</button>
     </div>
@@ -3113,22 +3192,26 @@
   <div id="agro-chat-msgs" class="agro-chat-messages">
     <div class="agro-msg agro-msg-bot">
       <div class="agro-bubble-bot">
-        🌾 <strong>Welcome to AgroBot AI!</strong><br/>
-        I am your precision agricultural pathologist. Whenever you scan a leaf on the dashboard, I automatically incorporate the <strong>disease pathology, Grad-CAM lesion area (%), and live weather telemetry</strong> to provide actionable treatment plans.<br/><br/>
-        Tap a quick topic below or type your question!
+        🌾 <strong>नमस्ते! AgroBot AI में आपका स्वागत है।</strong><br/>
+        मैं आपका पादप रोग विशेषज्ञ सहायक हूँ। आप बोलकर (🎤) या लिखकर किसी भी भाषा में पूछ सकते हैं। डैशबोर्ड पर पत्ती स्कैन करने पर मैं <strong>रोग, Grad-CAM घाव क्षेत्र (%) और मौसम</strong> के अनुसार सटीक दवा और उपचार बताता हूँ।<br/><br/>
+        नीचे दिए गए सुझावों पर क्लिक करें या 🎤 दबाकर बोलें!
       </div>
     </div>
   </div>
 
   <div class="agro-chat-chips">
-    <button class="agro-chip-btn" data-prompt="What spray should I apply for this disease today?">💧 What spray to apply?</button>
-    <button class="agro-chip-btn" data-prompt="How does current rainfall and humidity affect disease progression?">🌧️ Rain & spread risk</button>
-    <button class="agro-chip-btn" data-prompt="Give me organic and neem oil remedies with exact recipe.">🌿 Organic & neem recipe</button>
-    <button class="agro-chip-btn" data-prompt="Should I prune the infected leaves immediately?">✂️ Pruning guidance</button>
+    <button class="agro-chip-btn" data-prompt="इस रोग के लिए आज कौन सी दवा का छिड़काव करें?">💧 कौन सी दवा छिड़कें?</button>
+    <button class="agro-chip-btn" data-prompt="बारिश और नमी से रोग फैलने का कितना खतरा है?">🌧️ बारिश और मौसम का जोखिम</button>
+    <button class="agro-chip-btn" data-prompt="नीम के तेल का जैविक उपचार और सही मात्रा बताएं।">🌿 नीम तेल जैविक उपाय</button>
+    <button class="agro-chip-btn" data-prompt="क्या रोगी पत्तियों को तुरंत काट देना चाहिए?">✂️ छंटाई (Pruning) सलाह</button>
   </div>
 
   <div class="agro-chat-input-bar">
-    <input type="text" id="agro-chat-input" placeholder="Ask AgroBot about sprays, weather risks, dosages..." autocomplete="off" />
+    <!-- Mic Voice Input Button -->
+    <button id="agro-chat-mic" class="agro-chat-mic-btn" title="Speak into microphone (Voice Input)">
+      🎤
+    </button>
+    <input type="text" id="agro-chat-input" placeholder="Ask question or tap 🎤 to speak..." autocomplete="off" />
     <button id="agro-chat-send" title="Send message">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
     </button>
@@ -3137,11 +3220,14 @@
 
 <script>
   /* ════════════════════════════════════════════════════════════
-     AGROBOT AI — MULTIMODAL GROUNDED CHATBOT WIDGET LOGIC
+     AGROBOT AI — MULTILINGUAL VOICE & TELEMETRY GROUNDED AGENT
   ════════════════════════════════════════════════════════════ */
   (function initAgroChatbot() {
     let chatHistory = [];
     let isWaiting = false;
+    let autoSpeak = false;
+    let isRecording = false;
+    let currentSpeakingBtn = null;
 
     const chatBtn = document.getElementById('agro-chat-fab');
     const chatModal = document.getElementById('agro-chat-modal');
@@ -3149,11 +3235,24 @@
     const chatClear = document.getElementById('agro-chat-clear');
     const chatInput = document.getElementById('agro-chat-input');
     const chatSend = document.getElementById('agro-chat-send');
+    const chatMic = document.getElementById('agro-chat-mic');
     const chatMsgs = document.getElementById('agro-chat-msgs');
     const ctxText = document.getElementById('agro-ctx-text');
     const ctxIcon = document.getElementById('agro-ctx-icon');
     const chatBadge = document.getElementById('agro-chat-badge');
+    const langSelect = document.getElementById('agro-chat-lang');
+    const ttsToggle = document.getElementById('agro-chat-tts-toggle');
     const chipBtns = document.querySelectorAll('.agro-chip-btn');
+
+    // Auto-Speak Toggle
+    if (ttsToggle) {
+      ttsToggle.addEventListener('click', () => {
+        autoSpeak = !autoSpeak;
+        ttsToggle.textContent = autoSpeak ? '🔊' : '🔈';
+        ttsToggle.style.background = autoSpeak ? 'rgba(52, 211, 153, 0.3)' : 'rgba(255, 255, 255, 0.12)';
+        ttsToggle.title = autoSpeak ? 'Auto Voice Readout: ON' : 'Auto Voice Readout: OFF';
+      });
+    }
 
     // Toggle Chat
     function toggleChat(forceOpen = null) {
@@ -3167,6 +3266,8 @@
         scrollChatToBottom();
       } else {
         chatModal.classList.remove('agro-open');
+        stopSpeech();
+        stopVoiceRecognition();
         setTimeout(() => { chatModal.style.display = 'none'; }, 220);
       }
     }
@@ -3188,24 +3289,21 @@
       ctxText.textContent = `Active: ${summaryParts.join(' • ')}`;
       if (ctxIcon) ctxIcon.textContent = d.prediction?.includes('healthy') ? '🌿' : '🌾';
 
-      // Pulse notification on button
       if (chatBadge) {
         chatBadge.style.display = 'flex';
         chatBadge.textContent = '1';
       }
 
-      // Add a non-intrusive contextual prompt if chat area is empty
       if (chatMsgs && chatMsgs.children.length <= 1) {
         appendBotMessage(`🔍 **New Scan Detected**: Diagnosed as **${title}** (${conf}% confidence)${aff ? ` with **${aff}** covered by lesions` : ''}. Ask me below for spray schedules, rain impact, or organic remedies!`);
       }
     };
 
-    // Scroll Helper
     function scrollChatToBottom() {
       if (chatMsgs) chatMsgs.scrollTop = chatMsgs.scrollHeight;
     }
 
-    // Simple Markdown to Safe HTML formatter
+    // Markdown Parser
     function formatMarkdown(text) {
       if (!text) return '';
       let html = text
@@ -3213,26 +3311,83 @@
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
-      // Headers (### )
       html = html.replace(/^### (.*$)/gim, '<div style="font-weight:700;color:#064e3b;font-size:0.92rem;margin:8px 0 4px 0;">$1</div>');
       html = html.replace(/^## (.*$)/gim, '<div style="font-weight:800;color:#064e3b;font-size:0.98rem;margin:10px 0 4px 0;">$1</div>');
-
-      // Bold and Italic
       html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
       html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-      // Inline code
       html = html.replace(/`(.*?)`/g, '<code style="background:rgba(16,185,129,0.1);color:#065f46;padding:1px 5px;border-radius:4px;font-size:0.84em;font-weight:600;">$1</code>');
-
-      // Lists
       html = html.replace(/^\s*[\-\*]\s+(.*$)/gim, '<div style="display:flex;gap:6px;margin:2px 0 2px 8px;"><span style="color:#10b981;font-weight:700;">•</span><div>$1</div></div>');
       html = html.replace(/^\s*(\d+)\.\s+(.*$)/gim, '<div style="display:flex;gap:6px;margin:2px 0 2px 8px;"><span style="color:#059669;font-weight:700;">$1.</span><div>$2</div></div>');
-
-      // Paragraphs
       html = html.replace(/\n\n/g, '<div style="height:6px;"></div>');
       html = html.replace(/\n/g, '<br/>');
-
       return html;
+    }
+
+    // Clean Text for Speech Synthesis
+    function cleanForSpeech(raw) {
+      return raw
+        .replace(/###/g, '')
+        .replace(/##/g, '')
+        .replace(/#/g, '')
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .replace(/`/g, '')
+        .replace(/•/g, '')
+        .replace(/^\s*\d+\.\s+/gm, '')
+        .replace(/<[^>]*>/g, '')
+        .replace(/\n+/g, '. ')
+        .trim();
+    }
+
+    function stopSpeech() {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      if (currentSpeakingBtn) {
+        currentSpeakingBtn.textContent = '🔊 Listen';
+        currentSpeakingBtn.classList.remove('agro-speaking');
+        currentSpeakingBtn = null;
+      }
+    }
+
+    function speakText(rawText, btnElement = null) {
+      if (!('speechSynthesis' in window)) {
+        alert('Voice readout is supported in modern browsers.');
+        return;
+      }
+
+      // If already speaking this button, stop
+      if (currentSpeakingBtn === btnElement && window.speechSynthesis.speaking) {
+        stopSpeech();
+        return;
+      }
+
+      stopSpeech();
+
+      const text = cleanForSpeech(rawText);
+      const utter = new SpeechSynthesisUtterance(text);
+      const selOption = langSelect ? langSelect.options[langSelect.selectedIndex] : null;
+      const langCode = selOption ? (selOption.getAttribute('data-code') || 'hi-IN') : 'hi-IN';
+
+      utter.lang = langCode;
+      utter.rate = 0.98;
+      utter.pitch = 1.0;
+
+      // Select voice matching language if available
+      const voices = window.speechSynthesis.getVoices();
+      const match = voices.find(v => v.lang === langCode || v.lang.startsWith(langCode.split('-')[0]));
+      if (match) utter.voice = match;
+
+      if (btnElement) {
+        currentSpeakingBtn = btnElement;
+        btnElement.textContent = '⏹️ Stop';
+        btnElement.classList.add('agro-speaking');
+      }
+
+      utter.onend = () => stopSpeech();
+      utter.onerror = () => stopSpeech();
+
+      window.speechSynthesis.speak(utter);
     }
 
     function appendUserMessage(text) {
@@ -3249,14 +3404,31 @@
       const msgDiv = document.createElement('div');
       msgDiv.className = 'agro-msg agro-msg-bot';
       const badge = modelUsed ? `<div class="agro-model-badge">⚡ ${modelUsed} Grounded</div>` : '';
-      msgDiv.innerHTML = `
-        <div class="agro-bubble-bot">
-          ${formatMarkdown(text)}
+      
+      const bubble = document.createElement('div');
+      bubble.className = 'agro-bubble-bot';
+      bubble.innerHTML = `
+        ${formatMarkdown(text)}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;">
+          <button class="agro-listen-btn" title="Listen to this advice">🔊 Listen</button>
           ${badge}
         </div>
       `;
+
+      // Attach speak button listener
+      const listenBtn = bubble.querySelector('.agro-listen-btn');
+      if (listenBtn) {
+        listenBtn.addEventListener('click', () => speakText(text, listenBtn));
+      }
+
+      msgDiv.appendChild(bubble);
       chatMsgs.appendChild(msgDiv);
       scrollChatToBottom();
+
+      // If auto-speak enabled, automatically read aloud
+      if (autoSpeak) {
+        speakText(text, listenBtn);
+      }
     }
 
     function showTypingIndicator() {
@@ -3281,6 +3453,7 @@
     }
 
     function clearChat() {
+      stopSpeech();
       if (!chatMsgs) return;
       chatMsgs.innerHTML = `
         <div class="agro-msg agro-msg-bot">
@@ -3293,7 +3466,72 @@
       chatHistory = [];
     }
 
-    // Send logic
+    // Voice Input Recognition Setup
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        isRecording = true;
+        if (chatMic) {
+          chatMic.classList.add('agro-mic-recording');
+          chatMic.title = 'Listening… Tap to cancel';
+        }
+        if (chatInput) chatInput.placeholder = '🎙️ Listening to your voice…';
+      };
+
+      recognition.onresult = (e) => {
+        const transcript = e.results[0][0].transcript;
+        if (chatInput) chatInput.value = transcript;
+        sendMessage(transcript);
+      };
+
+      recognition.onerror = (e) => {
+        console.warn('Speech Recognition notice:', e.error);
+        stopVoiceRecognition();
+      };
+
+      recognition.onend = () => {
+        stopVoiceRecognition();
+      };
+    }
+
+    function toggleVoiceRecognition() {
+      if (!recognition) {
+        alert('Voice input is supported in Chrome, Edge, Safari, and Android browsers.');
+        return;
+      }
+      if (isRecording) {
+        recognition.stop();
+        stopVoiceRecognition();
+      } else {
+        const selOption = langSelect ? langSelect.options[langSelect.selectedIndex] : null;
+        const langCode = selOption ? (selOption.getAttribute('data-code') || 'hi-IN') : 'hi-IN';
+        recognition.lang = langCode;
+        try {
+          recognition.start();
+        } catch (err) {
+          console.warn('Mic start notice:', err);
+        }
+      }
+    }
+
+    function stopVoiceRecognition() {
+      isRecording = false;
+      if (chatMic) {
+        chatMic.classList.remove('agro-mic-recording');
+        chatMic.title = 'Speak into microphone (Voice Input)';
+      }
+      if (chatInput) chatInput.placeholder = 'Ask question or tap 🎤 to speak...';
+    }
+
+    if (chatMic) chatMic.addEventListener('click', toggleVoiceRecognition);
+
+    // Send Message Logic
     async function sendMessage(text) {
       const msg = (text || (chatInput ? chatInput.value : '') || '').trim();
       if (!msg || isWaiting) return;
@@ -3301,7 +3539,6 @@
       if (chatInput) chatInput.value = '';
       appendUserMessage(msg);
 
-      // Context gathering
       let scanCtx = {};
       if (typeof lastScanResult !== 'undefined' && lastScanResult) {
         scanCtx = {
@@ -3312,6 +3549,8 @@
           timeline_notes: lastScanResult.spread_risk?.explanation || ''
         };
       }
+
+      const currentLang = langSelect ? langSelect.value : 'Hindi';
 
       isWaiting = true;
       if (chatSend) chatSend.disabled = true;
@@ -3324,6 +3563,7 @@
           body: JSON.stringify({
             message: msg,
             context: scanCtx,
+            language: currentLang,
             history: chatHistory.slice(-6)
           })
         });
@@ -3358,7 +3598,7 @@
       });
     }
 
-    // Quick Chips click
+    // Chips
     chipBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         const prompt = btn.getAttribute('data-prompt');

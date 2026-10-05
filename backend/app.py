@@ -161,17 +161,20 @@ def chat():
         if rec:
             context["knowledge_record"] = rec
 
+    language = data.get("language", "English")
+
     try:
         from .chatbot import generate_chat_response
     except (ImportError, ValueError):
         from chatbot import generate_chat_response
 
-    result = generate_chat_response(message, scan_context=context, history=history)
+    result = generate_chat_response(message, scan_context=context, history=history, language=language)
     return jsonify({
         "success": True,
         "reply": result["reply"],
         "grounded": result["grounded"],
-        "model_used": result["model_used"]
+        "model_used": result["model_used"],
+        "language": language
     })
 
 

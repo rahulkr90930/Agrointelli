@@ -69,27 +69,30 @@ CRITICAL RULES:
 """
 
 
-def generate_chat_response(user_message, scan_context=None, history=None):
+FAST_MODELS = [
+    "models/gemini-3.5-flash-lite",
+    "models/gemini-3.1-flash-lite",
+    "models/gemini-flash-latest"
+]
+
+FAST_GEN_CONFIG = {
+    "max_output_tokens": 320,
+    "temperature": 0.25,
+}
+
+
+def generate_chat_response(user_message, scan_context=None, history=None, language="English"):
     """
-    Generate an agronomic response grounded in scan telemetry and disease knowledge.
-    
-    Args:
-        user_message (str): Farmer's query.
-        scan_context (dict): Telemetry from the current diagnosis:
-            - prediction: str (e.g. 'tomato_early_blight')
-            - confidence_pct: float
-            - affected_pct: float (from Grad-CAM)
-            - weather: dict (temp_c, humidity_pct, rain_1h_mm, city)
-            - timeline_notes: str (e.g. 'Day 1: 12% -> Day 5: 18%')
-            - knowledge_record: dict (from disease_knowledge.csv)
-        history (list): Optional previous conversation turns [{role: 'user'|'model', text: str}].
-    
-    Returns:
-        dict: {'reply': str, 'grounded': bool, 'model_used': str}
+    Generate an ultra-fast agronomic response grounded in scan telemetry,
+    disease knowledge, and requested language (English, Hindi, Spanish, etc.).
     """
     if not user_message or not user_message.strip():
+        welcome_msgs = {
+            "Hindi": "नमस्ते! मैं एग्रोबॉट हूँ, आपका कृषि सहायक। पत्ती स्कैन करें या फसल रोग, दवा छिड़काव और मौसम जोखिम के बारे में पूछें।",
+            "Spanish": "¡Hola! Soy AgroBot, su asistente de salud vegetal. Escanee una hoja o consulte sobre enfermedades y tratamientos.",
+        }
         return {
-            "reply": "Hello! I am AgroBot, your plant health assistant. Scan a leaf or ask me anything about crop diseases, treatment sprays, or weather risks.",
+            "reply": welcome_msgs.get(language, "Hello! I am AgroBot, your plant health assistant. Scan a leaf or ask me anything about crop diseases, treatment sprays, or weather risks."),
             "grounded": False,
             "model_used": "system"
         }
@@ -134,25 +137,32 @@ def generate_chat_response(user_message, scan_context=None, history=None):
 [FARMER QUESTION]
 "{user_message}"
 
-Answer as the AgroIntelli plant pathologist using the scan telemetry and scientific grounding above.
+[RESPONSE REQUIREMENTS]
+1. Target Language: {language}. Write naturally in {language} (use proper native script, e.g., Devanagari for Hindi).
+2. Keep the advice concise, fast, and structured in 3-4 bullet points.
+3. Include specific chemical spray dosage (g/L) or organic recipe, rain precautions, and timing.
 """
 
-    # If Gemini is available, query model
-    if _model is not None:
-        try:
-            full_prompt = f"{SYSTEM_PROMPT}\n\n{context_prompt}"
-            response = _model.generate_content(full_prompt)
-            if response and response.text:
-                return {
-                    "reply": response.text.strip(),
-                    "grounded": True,
-                    "model_used": "Gemini Flash"
-                }
-        except Exception as e:
-            print(f"⚠ Gemini API error, falling back to rule-grounded response: {e}")
+    # Try fast model candidates in sequence
+    if _gemini_client is not None and GEMINI_API_KEY:
+        for model_name in FAST_MODELS:
+            try:
+                candidate_model = _gemini_client.GenerativeModel(model_name, generation_config=FAST_GEN_CONFIG)
+                full_prompt = f"{SYSTEM_PROMPT}\n\n{context_prompt}"
+                response = candidate_model.generate_content(full_prompt)
+                if response and response.text:
+                    display_name = model_name.split("/")[-1].replace("gemini-", "Gemini ")
+                    return {
+                        "reply": response.text.strip(),
+                        "grounded": True,
+                        "model_used": display_name
+                    }
+            except Exception as e:
+                # Log and fallback to next candidate
+                continue
 
     # Fallback to local rule-grounded reasoning if offline / API error
-    fallback_reply = _build_local_grounded_reply(user_message, pred, aff_pct, weather, knowledge)
+    fallback_reply = _build_local_grounded_reply(user_message, pred, aff_pct, weather, knowledge, language=language)
     return {
         "reply": fallback_reply,
         "grounded": True,
@@ -160,7 +170,7 @@ Answer as the AgroIntelli plant pathologist using the scan telemetry and scienti
     }
 
 
-def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge):
+def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, language="English"):
     """Generates an immediate, high-quality agronomic response using local knowledge."""
     q_lower = query.lower()
     crop = knowledge.get("crop", "your crop")
