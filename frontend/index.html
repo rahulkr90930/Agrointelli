@@ -164,68 +164,105 @@
     }
 
     /* ════════════════════════════════════════════════════════════
-       TOP ROW (2-col)
+       TOP ROW (2-col: Diagnostic Uploader & Diagnostic Controls)
     ════════════════════════════════════════════════════════════ */
     .top-row {
       display:grid;
       grid-template-columns: 1.25fr 0.75fr;
-      gap:1.75rem; align-items:start;
+      gap:1.75rem;
+      align-items:stretch; /* Equalize column heights */
+    }
+    .top-row > .card {
+      display:flex;
+      flex-direction:column;
+      height:100%;
     }
     @media(max-width:900px) { .top-row{grid-template-columns:1fr;} }
 
     /* ════════════════════════════════════════════════════════════
-       UPLOAD ZONE
+       UPLOAD ZONE (Tall, Prominent Diagnostic Drop Area)
     ════════════════════════════════════════════════════════════ */
     .upload-zone {
-      border: 2px dashed rgba(16,185,129,0.25);
+      border: 2px dashed rgba(16,185,129,0.3);
       border-radius:var(--r-lg);
-      padding: 2.5rem 1.5rem;
+      padding: 3rem 2rem;
       text-align:center; cursor:pointer;
-      background: linear-gradient(145deg, rgba(16,185,129,0.015), rgba(6,182,212,0.01));
+      background: linear-gradient(145deg, rgba(16,185,129,0.02), rgba(6,182,212,0.015));
       transition: var(--ease); position:relative;
+      flex: 1; /* Expand to match Diagnostic Controls height */
+      min-height: 420px; /* Generous height matching controls */
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
     }
     .upload-zone:hover, .upload-zone.drag-over {
-      background: rgba(16,185,129,0.04);
+      background: rgba(16,185,129,0.05);
       border-color: var(--green);
-      box-shadow: inset 0 0 24px rgba(16,185,129,0.04);
+      box-shadow: inset 0 0 32px rgba(16,185,129,0.06);
     }
-    /* The file input spans the whole zone — NO pointer-events:none here */
+    /* The file input spans the whole zone */
     .upload-zone > input[type="file"] {
-      position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%;
+      position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; z-index:3;
     }
-    .upload-zone.compact { padding:0.9rem 1.1rem; display:flex; align-items:center; gap:0.85rem; text-align:left; border-style:solid; border-color:rgba(16,185,129,0.2); }
+    .upload-zone.compact {
+      flex: 0 0 auto;
+      min-height: unset;
+      padding:0.85rem 1.15rem;
+      display:flex;
+      align-items:center;
+      gap:0.85rem;
+      text-align:left;
+      border-style:solid;
+      border-color:rgba(16,185,129,0.2);
+      margin-bottom:0.85rem;
+    }
     .upload-zone.compact .uz-icon { font-size:1.4rem; animation:none !important; margin:0; }
     .upload-zone.compact .uz-sub  { display:none; }
     .upload-zone.compact .uz-hint { display:none; }
-    .uz-icon { font-size:2.6rem; display:block; margin-bottom:0.5rem; animation:float 3s ease-in-out infinite; }
-    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
-    .uz-label { font-size:0.95rem; color:var(--text-2); }
-    .uz-label strong { color:var(--green); font-weight:600; }
-    .uz-sub  { font-size:0.78rem; color:var(--text-3); margin-top:3px; }
-    .uz-hint { font-size:0.7rem; color:var(--text-4); display:block; margin-top:5px; }
+    .uz-icon { font-size:3.6rem; display:block; margin-bottom:0.9rem; animation:float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+    .uz-label { font-size:1.12rem; color:var(--text-2); }
+    .uz-label strong { color:var(--green); font-weight:700; }
+    .uz-sub  { font-size:0.86rem; color:var(--text-3); margin-top:5px; }
+    .uz-hint {
+      font-size:0.78rem; color:var(--text-4); display:inline-block; margin-top:14px;
+      background:rgba(16,185,129,0.06); padding:5px 14px; border-radius:20px;
+      border:1px solid rgba(16,185,129,0.14);
+    }
 
     @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-7px)} 40%,80%{transform:translateX(7px)} }
     .shake { animation:shake 0.35s ease-in-out; border-color:var(--red)!important; background:rgba(220,38,38,0.025)!important; }
 
     /* Preview block */
     #preview-wrap {
-      display:none; margin-top:1rem; border-radius:var(--r-md); overflow:hidden;
+      display:none;
+      flex: 1; /* Fill remaining height when compact header is active */
+      min-height: 340px;
+      margin-top:0;
+      border-radius:var(--r-md); overflow:hidden;
       position:relative; border:1px solid var(--border); box-shadow:var(--sh-sm);
       animation:slideUp 0.25s ease;
+      background:var(--surface2);
     }
     @keyframes slideUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-    #preview-img { width:100%; max-height:230px; object-fit:contain; display:block; padding:0.35rem; background:var(--surface2); }
+    #preview-img {
+      width:100%; height:100%; max-height:380px; object-fit:contain; display:block;
+      padding:0.6rem; background:var(--surface2);
+    }
     #remove-img {
-      position:absolute; top:8px; right:8px;
-      background:rgba(0,0,0,0.6); color:#fff; border:none; border-radius:50%;
-      width:26px; height:26px; font-size:0.72rem; cursor:pointer;
+      position:absolute; top:10px; right:10px;
+      background:rgba(0,0,0,0.65); color:#fff; border:none; border-radius:50%;
+      width:28px; height:28px; font-size:0.75rem; cursor:pointer;
       display:flex; align-items:center; justify-content:center; transition:var(--ease);
+      z-index:10;
     }
     #remove-img:hover { background:var(--red); transform:scale(1.1); }
 
     .batch-scroll-btn {
-      display:inline-flex; align-items:center; gap:0.4rem; margin-top:1rem;
-      padding:0.5rem 1rem; border-radius:var(--r-md); cursor:pointer;
+      display:inline-flex; align-items:center; gap:0.4rem;
+      margin-top:auto; /* Anchor to bottom of uploader card */
+      padding:0.55rem 1.1rem; border-radius:var(--r-md); cursor:pointer;
       font-size:0.78rem; font-weight:700; color:var(--green-xdark);
       background:rgba(16,185,129,0.07); border:1px solid rgba(16,185,129,0.16);
       transition:var(--ease);
