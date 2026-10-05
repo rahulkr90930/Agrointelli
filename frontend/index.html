@@ -803,11 +803,57 @@
       display: flex; align-items: center; gap: 0.75rem; font-size: 0.84rem;
     }
 
-    /* Responsive tweaks */
-    @media(max-width:640px){
-      header { padding:0.75rem 1.1rem; }
-      .page  { padding:1rem 1rem 4rem; }
-      .card  { padding:1.25rem; }
+    /* Responsive tweaks for mobile & tablets */
+    @media(max-width:768px){
+      header {
+        padding: 0.75rem 1rem;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+      }
+      .logo-wrap { justify-content: flex-start; }
+      .header-right {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+      }
+      .page { padding: 1rem 0.75rem 4rem; gap: 1.25rem; }
+      .card { padding: 1.15rem; }
+      .journal-hero-card {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.9rem;
+      }
+      .journal-hero-card button { width: 100%; justify-content: center; }
+      .modal-box {
+        width: 95% !important;
+        max-width: 95% !important;
+        margin: 0.5rem !important;
+        padding: 1.25rem !important;
+        max-height: 90vh;
+      }
+      .compare-grid {
+        grid-template-columns: 1fr !important;
+      }
+      .bottom-save-grid {
+        grid-template-columns: 1fr !important;
+      }
+      .jc-head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+      }
+      .jc-actions {
+        flex-wrap: wrap;
+        width: 100%;
+      }
+      .jc-actions button {
+        flex: 1;
+        justify-content: center;
+      }
     }
   </style>
 </head>
@@ -921,6 +967,30 @@
           <!-- Hidden radios — pointer-events:none is fine here, they're truly hidden -->
           <input type="radio" name="mode" id="mode-field" value="field" class="radio-hidden" checked />
           <input type="radio" name="mode" id="mode-lab"   value="lab"   class="radio-hidden" />
+        </div>
+
+        <!-- Model Architecture Selector -->
+        <div>
+          <div class="ctrl-section-label" style="display:flex;align-items:center;justify-content:space-between;">
+            <span>🧠 Model Architecture</span>
+            <span class="card-badge" id="badge-model-arch" style="font-size:0.64rem;background:rgba(16,185,129,0.12);color:var(--green-dark);">MobileNetV3 Active</span>
+          </div>
+          <div class="mode-grid">
+            <div class="mode-card active" id="card-arch-mobilenet">
+              <div class="mc-icon">⚡</div>
+              <div>
+                <div class="mc-title">MobileNetV3</div>
+                <div class="mc-desc">Edge / Fast (38ms)</div>
+              </div>
+            </div>
+            <div class="mode-card" id="card-arch-efficientnet">
+              <div class="mc-icon">🎯</div>
+              <div>
+                <div class="mc-title">EfficientNet-B0</div>
+                <div class="mc-desc">Deep Fusion &bull; Precision</div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Image timing toggle -->
@@ -1081,7 +1151,10 @@
         <!-- Hero banner -->
         <div class="hero-banner">
           <div>
-            <div class="hb-tag">Primary Diagnosis</div>
+            <div class="hb-tag" style="display:flex;align-items:center;gap:0.5rem;">
+              <span>Primary Diagnosis</span>
+              <span id="res-arch-badge" style="display:none;padding:0.15rem 0.55rem;background:rgba(255,255,255,0.22);border-radius:12px;font-size:0.75rem;font-weight:600;text-transform:none;letter-spacing:normal;">⚡ MobileNetV3</span>
+            </div>
             <div class="hb-name" id="res-disease">—</div>
             <button type="button" class="header-journal-btn" id="btn-save-current-scan" style="margin-top:0.75rem;background:#fff;border-color:var(--green);font-size:0.75rem;">
               💾 Save Leaf to Journal (Track Day 1 ➔ Day 7)
@@ -1220,7 +1293,7 @@
               </span>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;margin-top:1rem;">
+            <div class="bottom-save-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;margin-top:1rem;">
               <div class="form-group">
                 <label>Plant / Crop Nickname</label>
                 <input type="text" class="form-control" id="bottom-save-plant-name" placeholder="e.g. Tomato Plot #1 - Leaf A" />
@@ -1367,22 +1440,51 @@
         </button>
       </form>
 
-      <div id="recheck-result-wrap" style="display:none;">
-        <div class="compare-container">
-          <h4 style="font-size:0.9rem;color:var(--green-xdark);margin-bottom:0.6rem;">📊 Progression Comparison (Baseline vs Today)</h4>
-          <div class="compare-grid">
-            <div class="compare-col" id="col-baseline">
-              <h5>Baseline Scan</h5>
-              <div style="font-weight:700;color:var(--text-1);" id="comp-base-pred">—</div>
-              <div style="font-size:1.3rem;font-weight:800;color:var(--amber);margin-top:2px;" id="comp-base-pct">—</div>
+      <div id="recheck-result-wrap" style="display:none;margin-top:1.25rem;">
+        <div class="compare-container" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-md);padding:1.2rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.9rem;">
+            <h4 style="font-size:0.95rem;color:var(--green-xdark);margin:0;font-weight:700;">📊 Temporal &amp; Epidemiological Progression</h4>
+            <span id="recheck-days-pill" class="jc-pill" style="background:rgba(16,185,129,0.12);color:var(--green-dark);font-weight:700;">Day 1 → Day 7</span>
+          </div>
+
+          <!-- Side-by-side Visual Comparison with Grad-CAM -->
+          <div class="compare-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.9rem;">
+            <!-- Left: Baseline Scan -->
+            <div class="compare-col" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.85rem;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+                <h5 style="margin:0;font-size:0.74rem;text-transform:uppercase;color:var(--text-3);" id="comp-base-stage">Baseline Scan</h5>
+                <span id="comp-base-date" style="font-size:0.7rem;color:var(--text-4);"></span>
+              </div>
+              <div style="width:100%;aspect-ratio:1;border-radius:var(--r-sm);overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;margin-bottom:0.6rem;position:relative;">
+                <img id="comp-base-img" style="width:100%;height:100%;object-fit:cover;" src="" alt="Baseline Leaf" />
+                <span class="gc-img-badge" style="position:absolute;top:6px;left:6px;font-size:0.62rem;">Baseline Saliency</span>
+              </div>
+              <div style="font-weight:700;color:var(--text-1);font-size:0.88rem;text-transform:capitalize;" id="comp-base-pred">—</div>
+              <div style="font-size:1.15rem;font-weight:800;color:var(--amber);margin-top:2px;" id="comp-base-pct">—</div>
+              <div id="comp-base-weather" style="font-size:0.72rem;color:var(--text-3);margin-top:0.45rem;padding-top:0.45rem;border-top:1px dashed var(--border);"></div>
             </div>
-            <div class="compare-col" id="col-current">
-              <h5>Current Scan</h5>
-              <div style="font-weight:700;color:var(--text-1);" id="comp-curr-pred">—</div>
-              <div style="font-size:1.3rem;font-weight:800;color:var(--green);margin-top:2px;" id="comp-curr-pct">—</div>
+
+            <!-- Right: Today's Re-Check -->
+            <div class="compare-col" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.85rem;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+                <h5 style="margin:0;font-size:0.74rem;text-transform:uppercase;color:var(--text-3);" id="comp-curr-stage">Today's Re-Check</h5>
+                <span id="comp-curr-date" style="font-size:0.7rem;color:var(--text-4);"></span>
+              </div>
+              <div style="width:100%;aspect-ratio:1;border-radius:var(--r-sm);overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;margin-bottom:0.6rem;position:relative;">
+                <img id="comp-curr-img" style="width:100%;height:100%;object-fit:cover;" src="" alt="Current Leaf" />
+                <span class="gc-img-badge" style="position:absolute;top:6px;left:6px;font-size:0.62rem;">Grad-CAM Today</span>
+              </div>
+              <div style="font-weight:700;color:var(--text-1);font-size:0.88rem;text-transform:capitalize;" id="comp-curr-pred">—</div>
+              <div style="font-size:1.15rem;font-weight:800;color:var(--green);margin-top:2px;" id="comp-curr-pct">—</div>
+              <div id="comp-curr-weather" style="font-size:0.72rem;color:var(--text-3);margin-top:0.45rem;padding-top:0.45rem;border-top:1px dashed var(--border);"></div>
             </div>
           </div>
-          <div id="compare-verdict-box" class="compare-verdict-banner"></div>
+
+          <!-- Epidemiological Weather Correlation & Spread Verdict -->
+          <div id="compare-verdict-box" class="compare-verdict-banner" style="margin-top:0.9rem;"></div>
+
+          <!-- Actionable Treatment Protocol -->
+          <div id="compare-advice-box" style="margin-top:0.75rem;padding:0.75rem 0.9rem;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.22);border-radius:var(--r-sm);font-size:0.8rem;line-height:1.45;"></div>
         </div>
       </div>
     </div>
@@ -1522,6 +1624,44 @@
     clearResults();
   });
 
+  /* ── Model Architecture Switching ────────────────────────── */
+  let selectedArchitecture = 'mobilenet';
+
+  function selectModelArch(arch) {
+    selectedArchitecture = arch;
+    const cardMob = document.getElementById('card-arch-mobilenet');
+    const cardEff = document.getElementById('card-arch-efficientnet');
+    const badge = document.getElementById('badge-model-arch');
+    if (arch === 'mobilenet') {
+      cardMob?.classList.add('active');
+      cardEff?.classList.remove('active');
+      if (badge) {
+        badge.textContent = 'MobileNetV3 Active';
+        badge.style.background = 'rgba(16,185,129,0.12)';
+        badge.style.color = 'var(--green-dark)';
+      }
+    } else {
+      cardEff?.classList.add('active');
+      cardMob?.classList.remove('active');
+      if (badge) {
+        badge.textContent = 'EfficientNet-B0 Active';
+        badge.style.background = 'rgba(6,182,212,0.12)';
+        badge.style.color = '#0891b2';
+      }
+    }
+    clearResults();
+  }
+
+  document.getElementById('card-arch-mobilenet')?.addEventListener('click', () => selectModelArch('mobilenet'));
+  document.getElementById('card-arch-efficientnet')?.addEventListener('click', () => selectModelArch('efficientnet'));
+
+  function toggleTimelineHistory(recordId) {
+    const el = document.getElementById(`timeline-drawer-${recordId}`);
+    if (el) {
+      el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
+    }
+  }
+
   /* ── Batch slots ─────────────────────────────────────────── */
   document.querySelectorAll('.batch-file-input').forEach(inp => {
     inp.addEventListener('change', e => {
@@ -1619,6 +1759,7 @@
     const fd = new FormData();
     fd.append('image', selectedFile); fd.append('mode', mode);
     fd.append('use_weather', useWeather ? 'true' : 'false');
+    fd.append('architecture', selectedArchitecture);
 
     try {
       const r = await fetch(`${API}/predict`, { method:'POST', body:fd });
@@ -1651,6 +1792,7 @@
     fd.append('labels', JSON.stringify(['Day 1','Day 5','Day 10']));
     fd.append('mode', mode);
     fd.append('use_weather', useWeather ? 'true' : 'false');
+    fd.append('architecture', selectedArchitecture);
 
     try {
       const r = await fetch(`${API}/batch_predict`, { method:'POST', body:fd });
@@ -1670,6 +1812,13 @@
 
     const title = d.prediction.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
     document.getElementById('res-disease').textContent = title;
+
+    const archBadge = document.getElementById('res-arch-badge');
+    if (archBadge) {
+      const isEff = (d.model_used || selectedArchitecture || '').includes('efficient');
+      archBadge.innerHTML = isEff ? '🎯 EfficientNet-B0' : '⚡ MobileNetV3';
+      archBadge.style.display = 'inline-block';
+    }
 
     // Pre-populate bottom save card for quick 1-click MongoDB storage
     const bottomNameEl = document.getElementById('bottom-save-plant-name');
@@ -1802,6 +1951,12 @@
     const wNote   = d.weather_note?.note||(d.weather?'Weather forecast factored.':'Weather was omitted.');
 
     document.getElementById('res-disease').textContent = 'Batch timeline evaluated';
+    const archBadge = document.getElementById('res-arch-badge');
+    if (archBadge) {
+      const isEff = (d.model_used || selectedArchitecture || '').includes('efficient');
+      archBadge.innerHTML = isEff ? '🎯 EfficientNet-B0' : '⚡ MobileNetV3';
+      archBadge.style.display = 'inline-block';
+    }
     document.getElementById('res-conf').textContent = trend.split(' ')[0];
     const ring = document.getElementById('res-ring');
     ring.style.strokeDashoffset = 0;
@@ -2084,7 +2239,8 @@
         const title = rec.plant_name || 'Tracked Leaf';
         const latestPred = (rec.latest_prediction || 'Unknown').replace(/_/g,' ');
         const latestPct  = rec.latest_affected_pct != null ? `${rec.latest_affected_pct}%` : '—';
-        const timelineLen = (rec.timeline || []).length;
+        const timeline = rec.timeline || [];
+        const timelineLen = timeline.length;
         const latestDay   = rec.latest_day || `Checkin #${timelineLen}`;
 
         let pillColor = 'rgba(16,185,129,0.1)';
@@ -2093,28 +2249,59 @@
         if (numPct >= 28) { pillColor = 'rgba(220,38,38,0.1)'; textColor = '#dc2626'; }
         else if (numPct >= 10) { pillColor = 'rgba(217,119,6,0.1)'; textColor = '#b45309'; }
 
+        const thumb = rec.thumbnail || (timeline[0] && timeline[0].gradcam_image);
+        const thumbHtml = thumb 
+          ? `<img src="${thumb}" style="width:48px;height:48px;border-radius:var(--r-sm);object-fit:cover;border:1.5px solid rgba(16,185,129,0.35);flex-shrink:0;" alt="Leaf Thumbnail" />`
+          : `<div style="width:48px;height:48px;border-radius:var(--r-sm);background:rgba(16,185,129,0.1);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;">🍃</div>`;
+
         html += `
-          <div class="journal-card">
-            <div class="jc-head">
-              <div>
-                <div class="jc-title">${title}</div>
-                <div class="jc-dates">Started: ${rec.created_at || 'Recently'} &bull; ${timelineLen} check-in${timelineLen > 1 ? 's' : ''}</div>
+          <div class="journal-card" style="border:1.5px solid var(--border);border-radius:var(--r-md);padding:1rem;margin-bottom:0.85rem;background:var(--surface);">
+            <div class="jc-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.6rem;">
+              <div style="display:flex;align-items:center;gap:0.75rem;">
+                ${thumbHtml}
+                <div>
+                  <div class="jc-title" style="font-weight:700;font-size:0.95rem;color:var(--green-xdark);">${title}</div>
+                  <div class="jc-dates" style="font-size:0.74rem;color:var(--text-3);margin-top:2px;">
+                    Started: ${rec.created_at || 'Recently'} &bull; ${timelineLen} check-in${timelineLen > 1 ? 's' : ''} logged
+                  </div>
+                </div>
               </div>
-              <span class="jc-pill" style="background:${pillColor};color:${textColor};text-transform:capitalize;">
+              <span class="jc-pill" style="background:${pillColor};color:${textColor};text-transform:capitalize;font-weight:700;font-size:0.75rem;padding:0.25rem 0.65rem;border-radius:20px;">
                 ${latestPred} (${latestPct} affected)
               </span>
             </div>
-            <div class="jc-body">
-              <div style="font-size:0.78rem;color:var(--text-2);line-height:1.4;">
-                <strong>Latest Status (${latestDay}):</strong> ${rec.latest_verdict || 'Awaiting follow-up recheck.'}
+            <div class="jc-body" style="margin-top:0.75rem;border-top:1px dashed var(--border);padding-top:0.65rem;">
+              <div style="font-size:0.78rem;color:var(--text-2);line-height:1.45;">
+                <strong>Latest Assessment (${latestDay}):</strong> ${rec.latest_verdict || 'Awaiting follow-up recheck.'}
               </div>
-              <div class="jc-actions">
-                <button class="btn btn-sm btn-teal" style="padding:0.32rem 0.75rem;font-size:0.75rem;" onclick="openRecheckModal('${rec.record_id}')">
+              <div class="jc-actions" style="display:flex;gap:0.5rem;margin-top:0.75rem;flex-wrap:wrap;">
+                <button class="btn btn-sm btn-teal" style="padding:0.38rem 0.85rem;font-size:0.75rem;font-weight:700;" onclick="openRecheckModal('${rec.record_id}')">
                   📸 Re-check This Leaf
                 </button>
-                <button class="btn btn-sm" style="background:rgba(220,38,38,0.08);color:#dc2626;border:1px solid rgba(220,38,38,0.2);padding:0.32rem 0.6rem;font-size:0.75rem;" onclick="deleteLeafRecord('${rec.record_id}')" title="Delete record">
-                  🗑️
+                <button class="btn btn-sm" style="background:rgba(16,185,129,0.08);color:var(--green-dark);border:1px solid rgba(16,185,129,0.25);padding:0.38rem 0.75rem;font-size:0.75rem;font-weight:600;" onclick="toggleTimelineHistory('${rec.record_id}')">
+                  📜 Timeline History (${timelineLen})
                 </button>
+                <button class="btn btn-sm" style="background:rgba(220,38,38,0.08);color:#dc2626;border:1px solid rgba(220,38,38,0.2);padding:0.38rem 0.65rem;font-size:0.75rem;" onclick="deleteLeafRecord('${rec.record_id}')" title="Delete record">
+                  🗑️ Delete
+                </button>
+              </div>
+              <div id="timeline-drawer-${rec.record_id}" style="display:none;margin-top:0.85rem;padding:0.85rem;background:var(--surface2);border-radius:var(--r-sm);border:1px solid var(--border);">
+                <div style="font-size:0.78rem;font-weight:700;color:var(--green-xdark);margin-bottom:0.5rem;">Chronological Leaf Progression:</div>
+                <div style="display:flex;flex-direction:column;gap:0.6rem;">
+                  ${timeline.map((entry, eIdx) => {
+                    const eThumb = entry.gradcam_image ? `<img src="${entry.gradcam_image}" style="width:40px;height:40px;border-radius:4px;object-fit:cover;flex-shrink:0;" />` : '🍃';
+                    const wSnap = entry.weather ? `🌤️ ${entry.weather.temp_c || 25}°C | ${entry.weather.humidity_pct || 70}% Hum | ${entry.weather.rain_1h_mm || 0}mm Rain` : '🌤️ Weather unrecorded';
+                    return `
+                      <div style="display:flex;align-items:center;gap:0.65rem;font-size:0.74rem;background:#fff;padding:0.5rem 0.7rem;border-radius:4px;border:1px solid var(--border);">
+                        ${eThumb}
+                        <div style="flex:1;">
+                          <div style="font-weight:700;color:var(--text-1);">${entry.day_label || ('Day ' + (entry.day_number || (eIdx+1)))}: <span style="text-transform:capitalize;">${(entry.prediction||'').replace(/_/g,' ')}</span> (${entry.affected_pct || 0}% affected)</div>
+                          <div style="color:var(--text-3);font-size:0.7rem;margin-top:1px;">${entry.timestamp || ''} &bull; ${wSnap}</div>
+                          ${entry.explanation ? `<div style="color:var(--text-2);font-size:0.72rem;margin-top:2px;">${entry.explanation}</div>` : ''}
+                        </div>
+                      </div>`;
+                  }).join('')}
+                </div>
               </div>
             </div>
           </div>`;
@@ -2248,6 +2435,7 @@
     fd.append('notes', notes);
     fd.append('mode', mode);
     fd.append('use_weather', useWeather);
+    fd.append('architecture', selectedArchitecture);
 
     try {
       const res = await fetch(`${API}/api/records/${encodeURIComponent(activeRecheckRecord.record_id)}/checkin`, {
@@ -2261,12 +2449,74 @@
       const resWrap = document.getElementById('recheck-result-wrap');
       resWrap.style.display = 'block';
 
-      document.getElementById('comp-base-pred').textContent = `${comp.previous_day} (${(data.record.initial_prediction||'').replace(/_/g,' ')})`;
-      document.getElementById('comp-base-pct').textContent = `${comp.previous_affected}%`;
+      // 1. Stage labels & Dates
+      const daysPill = document.getElementById('recheck-days-pill');
+      if (daysPill) daysPill.textContent = `${comp.previous_day} ➔ ${comp.current_day} (${comp.days_elapsed} days elapsed)`;
+      
+      const bStage = document.getElementById('comp-base-stage');
+      if (bStage) bStage.textContent = `${comp.previous_day}`;
+      const bDate = document.getElementById('comp-base-date');
+      if (bDate) bDate.textContent = comp.previous_date ? `📅 ${comp.previous_date}` : '';
 
-      document.getElementById('comp-curr-pred').textContent = `${data.latest_checkin.day_label} (${(data.latest_checkin.prediction||'').replace(/_/g,' ')})`;
-      document.getElementById('comp-curr-pct').textContent = `${comp.current_affected}%`;
+      const cStage = document.getElementById('comp-curr-stage');
+      if (cStage) cStage.textContent = `${comp.current_day}`;
+      const cDate = document.getElementById('comp-curr-date');
+      if (cDate) cDate.textContent = comp.current_date ? `📅 ${comp.current_date}` : '';
 
+      // 2. Images & Grad-CAM overlays
+      const baseImg = document.getElementById('comp-base-img');
+      if (baseImg) {
+        if (comp.previous_image) {
+          baseImg.src = comp.previous_image;
+          baseImg.style.display = 'block';
+        } else {
+          baseImg.style.display = 'none';
+        }
+      }
+
+      const currImg = document.getElementById('comp-curr-img');
+      if (currImg) {
+        if (comp.current_image) {
+          currImg.src = comp.current_image;
+          currImg.style.display = 'block';
+        } else {
+          currImg.style.display = 'none';
+        }
+      }
+
+      // 3. Predictions & Affected Surface %
+      const basePredEl = document.getElementById('comp-base-pred');
+      if (basePredEl) basePredEl.textContent = `${(comp.previous_prediction||'').replace(/_/g,' ')}`;
+      const basePctEl = document.getElementById('comp-base-pct');
+      if (basePctEl) basePctEl.textContent = `${comp.previous_affected}% affected`;
+
+      const currPredEl = document.getElementById('comp-curr-pred');
+      if (currPredEl) currPredEl.textContent = `${(comp.current_prediction||'').replace(/_/g,' ')}`;
+      const currPctEl = document.getElementById('comp-curr-pct');
+      if (currPctEl) currPctEl.textContent = `${comp.current_affected}% affected`;
+
+      // 4. Weather snapshots
+      const bWeatherEl = document.getElementById('comp-base-weather');
+      if (bWeatherEl) {
+        const bw = comp.previous_weather;
+        if (bw) {
+          bWeatherEl.innerHTML = `🌤️ ${bw.temp_c || 25}°C &bull; ${bw.humidity_pct || 70}% Hum &bull; ${bw.rain_1h_mm || 0}mm Rain`;
+        } else {
+          bWeatherEl.textContent = '🌤️ Weather unrecorded at baseline';
+        }
+      }
+
+      const cWeatherEl = document.getElementById('comp-curr-weather');
+      if (cWeatherEl) {
+        const cw = comp.current_weather;
+        if (cw) {
+          cWeatherEl.innerHTML = `🌤️ ${cw.temp_c || 25}°C &bull; ${cw.humidity_pct || 70}% Hum &bull; ${cw.rain_1h_mm || 0}mm Rain`;
+        } else {
+          cWeatherEl.textContent = '🌤️ Live weather snapshot unavailable';
+        }
+      }
+
+      // 5. Verdict Banner with Daily Velocity
       const vBox = document.getElementById('compare-verdict-box');
       let bgColor = 'rgba(16,185,129,0.08)';
       let bdrColor = 'rgba(16,185,129,0.25)';
@@ -2282,14 +2532,30 @@
         icon = '⚠️';
       }
 
+      const rateTxt = comp.rate_per_day != null ? ` (${comp.rate_per_day > 0 ? '+' : ''}${comp.rate_per_day}%/day)` : '';
       vBox.style.background = bgColor;
-      vBox.style.border = `1px solid ${bdrColor}`;
+      vBox.style.border = `1.5px solid ${bdrColor}`;
       vBox.innerHTML = `
-        <div style="font-size:1.4rem;">${icon}</div>
+        <div style="font-size:1.5rem;flex-shrink:0;">${icon}</div>
         <div>
-          <div style="font-weight:700;color:var(--green-xdark);">${comp.status_tag} (Delta: ${comp.delta > 0 ? '+' : ''}${comp.delta}%)</div>
-          <div style="color:var(--text-2);font-size:0.8rem;margin-top:2px;">${comp.explanation}</div>
+          <div style="font-weight:700;color:var(--green-xdark);font-size:0.92rem;">
+            ${comp.status_tag} &bull; Delta: ${comp.delta > 0 ? '+' : ''}${comp.delta}% over ${comp.days_elapsed} days${rateTxt}
+          </div>
+          <div style="color:var(--text-2);font-size:0.8rem;margin-top:3px;line-height:1.45;">
+            ${comp.explanation}
+          </div>
         </div>`;
+
+      // 6. Actionable Advice Section
+      const advBox = document.getElementById('compare-advice-box');
+      if (advBox) {
+        if (comp.advice) {
+          advBox.style.display = 'block';
+          advBox.innerHTML = `<strong>💡 Prescribed Field Protocol:</strong> ${comp.advice}`;
+        } else {
+          advBox.style.display = 'none';
+        }
+      }
 
       refreshRecordCount();
     } catch (err) {

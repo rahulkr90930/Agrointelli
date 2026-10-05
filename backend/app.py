@@ -252,27 +252,51 @@ OWM_API_KEY = os.environ.get("OWM_API_KEY", "0af35111bc4b73ebb0b71d505e063680")
 # ── Global model state ────────────────────────────────────────────────────────
 model = None
 grad_model = None
+available_models = {}
 class_names = []
 class_to_idx = {}
 advice_map = {}
 
 
 def load_model():
-    """Load the trained model and supporting files."""
-    global model, class_names, class_to_idx, advice_map
+    """Load trained models (supporting dual MobileNet & EfficientNet architectures) and supporting files."""
+    global model, grad_model, class_names, class_to_idx, advice_map, available_models
 
     if not TF_AVAILABLE:
         print("⚠  TensorFlow unavailable — running in demo mode.")
         return
 
-    if not MODEL_PATH.exists():
-        print(f"⚠  Model not found at {MODEL_PATH}")
-        print("   Train the notebook first, then copy artifacts to backend/models/")
-        return
+    # 1. Primary Model (MobileNetV3 / Default baseline)
+    if MODEL_PATH.exists():
+        try:
+            print(f"🔄 Loading AgroIntelli primary model from {MODEL_PATH.name}...")
+            model = keras.models.load_model(str(MODEL_PATH), compile=False)
+            available_models["primary"] = model
+            available_models["mobilenet"] = model
+            print(f"✅ Primary model loaded: {MODEL_PATH.name}")
+        except Exception as e:
+            print(f"⚠  Failed to load {MODEL_PATH.name}: {e}")
 
-    print("🔄 Loading AgroIntelli model...")
-    model = keras.models.load_model(str(MODEL_PATH), compile=False)
-    print(f"✅ Model loaded: {MODEL_PATH.name}")
+    # 2. Check for Architecture 2: EfficientNet-B0
+    eff_model_path = MODEL_DIR / "model_efficientnet_b0.keras"
+    if eff_model_path.exists():
+        try:
+            available_models["efficientnet"] = keras.models.load_model(str(eff_model_path), compile=False)
+            print(f"✅ Architecture 2 loaded: {eff_model_path.name}")
+        except Exception as e:
+            print(f"⚠  Failed to load EfficientNet-B0: {e}")
+
+    # 3. Check for specific Architecture 1 MobileNet file
+    mob_model_path = MODEL_DIR / "model_mobilenet.keras"
+    if mob_model_path.exists() and "mobilenet" not in available_models:
+        try:
+            available_models["mobilenet"] = keras.models.load_model(str(mob_model_path), compile=False)
+            print(f"✅ Architecture 1 loaded: {mob_model_path.name}")
+        except Exception as e:
+            pass
+
+    if model is None and available_models:
+        model = list(available_models.values())[0]
 
     if CLASS_MAP_PATH.exists():
         with open(CLASS_MAP_PATH) as f:
@@ -448,8 +472,105 @@ def severity_numeric(severity):
     return mapping.get(label, 0.0)
 
 
-def batch_progress_summary(entries):
-    """Summarise whether disease is improving, stable, or worsening."""
+import re
+
+def parse_day_num(label):
+    """Extract numeric day index from strings like 'Day 1', 'Day 7', 'Day 14'."""
+    if not label:
+        return None
+    match = re.search(r'\d+', str(label))
+    return int(match.group()) if match else None
+
+
+def evaluate_weather_progression(prev_weather, curr_weather, days_elapsed, prev_pred, curr_pred, prev_aff, curr_aff, curr_day_label="Current"):
+    """
+    Correlates elapsed days and meteorological conditions (rainfall, humidity, temperature)
+    with disease trajectory according to plant pathology principles.
+    """
+    delta = round(curr_aff - prev_aff, 1)
+    rate_per_day = round(delta / max(days_elapsed, 1), 2)
+
+    pw = prev_weather or {}
+    cw = curr_weather or {}
+
+    p_rain = float(pw.get("rain_1h_mm", 0.0) or 0.0)
+    p_hum  = float(pw.get("humidity_pct", 70.0) or 70.0)
+    p_temp = float(pw.get("temp_c", 25.0) or 25.0)
+
+    c_rain = float(cw.get("rain_1h_mm", 0.0) or 0.0)
+    c_hum  = float(cw.get("humidity_pct", 70.0) or 70.0)
+    c_temp = float(cw.get("temp_c", 25.0) or 25.0)
+
+    # Weather indicators
+    both_wet = (p_rain > 0 or p_hum >= 75) and (c_rain > 0 or c_hum >= 75)
+    curr_wet = c_rain > 0 or c_hum >= 75
+    curr_dry = c_rain == 0 and c_hum < 60
+
+    if curr_pred != prev_pred:
+        verdict = "NEW_DISEASE"
+        status_tag = "⚠️ Condition Shift"
+        expl = f"Pathology shifted from {prev_pred.replace('_',' ')} to {curr_pred.replace('_',' ')} over {days_elapsed} days."
+        if curr_wet:
+            expl += f" Sustained foliage wetness (Rain: {c_rain}mm, {c_hum}% humidity) provided an opportunistic entry pathway for secondary infection."
+        else:
+            expl += " Inspect affected tissue for secondary pathogens and revise management."
+    elif delta >= 3.0:
+        verdict = "WORSENED"
+        status_tag = "🔴 Accelerated Progression"
+        if both_wet:
+            expl = (
+                f"Critical Moisture Correlation: Both baseline and {curr_day_label} experienced high moisture and rainfall "
+                f"({c_rain}mm rain, {c_hum}% humidity). Continuous leaf wetness over {days_elapsed} days accelerated fungal spore "
+                f"germination and mycelial spread, expanding necrotic lesions by +{delta}% (+{rate_per_day}%/day)."
+            )
+        elif curr_wet:
+            expl = (
+                f"Wet Microclimate Risk: Recent precipitation ({c_rain}mm) and high humidity ({c_hum}%) over {days_elapsed} days "
+                f"fueled pathogen sporulation, increasing affected leaf surface by +{delta}% (+{rate_per_day}%/day)."
+            )
+        else:
+            expl = (
+                f"Active lesion expansion observed: +{delta}% spread over {days_elapsed} days (+{rate_per_day}%/day). "
+                f"Adjust fungicide application schedule."
+            )
+    elif delta <= -3.0:
+        verdict = "IMPROVED"
+        status_tag = "🟢 Significant Healing"
+        if curr_dry:
+            expl = (
+                f"Favorable Arid Conditions: Lesion coverage contracted by {abs(delta)}% over {days_elapsed} days "
+                f"(-{abs(rate_per_day)}%/day). Dry canopy conditions ({c_hum}% humidity, 0mm rain) suppressed airborne spore dispersal."
+            )
+        else:
+            expl = (
+                f"Positive Therapeutic Response: Lesion coverage contracted by {abs(delta)}% over {days_elapsed} days "
+                f"(-{abs(rate_per_day)}%/day). Treatment has successfully contained pathogen proliferation."
+            )
+    else:
+        verdict = "STABLE"
+        status_tag = "🟡 Stable / Monitored"
+        expl = (
+            f"Lesion severity is steady ({delta > 0 and '+' or ''}{delta}% over {days_elapsed} days, {rate_per_day}%/day). "
+            f"Continue routine surveillance."
+        )
+
+    return {
+        "verdict": verdict,
+        "status_tag": status_tag,
+        "explanation": expl,
+        "delta": delta,
+        "days_elapsed": days_elapsed,
+        "rate_per_day": rate_per_day,
+        "weather_context": {
+            "previous": {"rain": p_rain, "humidity": p_hum, "temp": p_temp},
+            "current": {"rain": c_rain, "humidity": c_hum, "temp": c_temp},
+            "consecutive_wet_days": both_wet
+        }
+    }
+
+
+def batch_progress_summary(entries, weather=None):
+    """Summarise multi-image progression factoring in day elapsed intervals and weather."""
     if not entries:
         return {
             "trend": "insufficient data",
@@ -468,31 +589,55 @@ def batch_progress_summary(entries):
             "explanation": "Upload at least two images to detect progression.",
         }
 
+    # Extract parsed day numbers
+    day_numbers = []
+    for idx, item in enumerate(entries):
+        d_num = parse_day_num(item.get("label", ""))
+        day_numbers.append(d_num if d_num is not None else (idx * 5 + 1))
+
+    total_days = max(day_numbers[-1] - day_numbers[0], 1)
     values = [item["severity_score"] for item in entries]
     delta = float(values[-1] - values[0])
+    rate_per_day = round(delta / total_days, 4)
+
     steps = [values[i] - values[i - 1] for i in range(1, len(values))]
     change_per_step = float(sum(steps) / len(steps))
-
     same_prediction = len({item["result"]["prediction"] for item in entries}) == 1
 
-    if delta > 0.08 or change_per_step > 0.05:
+    cw = weather or {}
+    c_rain = float(cw.get("rain_1h_mm", 0.0) or 0.0)
+    c_hum  = float(cw.get("humidity_pct", 70.0) or 70.0)
+    is_rainy = c_rain > 0 or c_hum >= 75
+
+    if delta > 0.05:
         trend = "worsening"
-        explanation = "Lesion severity is increasing across the batch."
-    elif delta < -0.08 or change_per_step < -0.05:
+        if is_rainy:
+            explanation = (
+                f"Accelerated Progression across {total_days} days (+{round(delta*100, 1)}% total, +{round(rate_per_day*100, 2)}%/day). "
+                f"Persistent high humidity ({c_hum}%) and rainfall ({c_rain}mm) compounded fungal spore proliferation."
+            )
+        else:
+            explanation = f"Lesion severity expanded by +{round(delta*100, 1)}% over {total_days} days (+{round(rate_per_day*100, 2)}%/day)."
+    elif delta < -0.05:
         trend = "improving"
-        explanation = "Lesion severity is decreasing across the batch."
+        explanation = (
+            f"Therapeutic Recovery: Lesion coverage contracted by {abs(round(delta*100, 1))}% across {total_days} days "
+            f"(-{abs(round(rate_per_day*100, 2))}%/day), confirming successful treatment."
+        )
     else:
-        trend = "stable / mixed"
-        explanation = "The disease signal is not changing sharply across the batch."
+        trend = "stable / controlled"
+        explanation = f"Disease severity remained stable ({round(delta*100, 1)}% change over {total_days} days)."
 
     if same_prediction:
-        explanation += " The predicted disease class stayed consistent."
+        explanation += " The diagnosed disease stayed consistent across all stages."
     else:
-        explanation += " The predicted class changes across samples, so interpret the trend carefully."
+        explanation += " Note: Detected disease class shifted across samples."
 
     return {
         "trend": trend,
         "delta": round(delta, 4),
+        "total_days": total_days,
+        "rate_per_day": rate_per_day,
         "change_per_step": round(change_per_step, 4),
         "same_prediction": same_prediction,
         "explanation": explanation,
@@ -512,9 +657,9 @@ def normalize_labels(labels, count):
     return out
 
 
-def predict_with_context(img_bgr, field_mode=True, weather=None):
+def predict_with_context(img_bgr, field_mode=True, weather=None, model_choice=None):
     """Run one prediction and enrich it with trend-friendly fields."""
-    result = run_prediction(img_bgr, field_mode=field_mode, weather=weather)
+    result = run_prediction(img_bgr, field_mode=field_mode, weather=weather, model_choice=model_choice)
     result["severity_score"] = severity_numeric(result.get("severity", {}))
     return result
 
@@ -753,9 +898,18 @@ def generate_gradcam_and_affected_pct(img_bgr, class_idx, class_name, weather=No
 
 # ── Prediction function ───────────────────────────────────────────────────────
 
-def run_prediction(img_bgr, field_mode=True, weather=None):
+def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None):
     """Run the full prediction pipeline and return a structured result dict."""
-    if model is None or not class_names:
+    active_model = model
+    used_arch = "mobilenet_v3"
+    if model_choice and model_choice.lower() in available_models:
+        active_model = available_models[model_choice.lower()]
+        used_arch = model_choice.lower()
+    elif "efficientnet" in available_models and model_choice == "efficientnet":
+        active_model = available_models["efficientnet"]
+        used_arch = "efficientnet_b0"
+
+    if active_model is None or not class_names:
         # Demo mode — return mock data when model is not loaded
         demo_gc = generate_gradcam_and_affected_pct(img_bgr, 0, "tomato_early_blight", weather=weather)
         return {
@@ -774,6 +928,7 @@ def run_prediction(img_bgr, field_mode=True, weather=None):
             "advice"         : "Apply protectant fungicide. Remove lower infected leaves. Maintain dry canopy.",
             "spread_risk"    : None,
             "mode"           : "field" if field_mode else "lab",
+            "architecture"   : used_arch,
             "demo_mode"      : True,
         }
 
@@ -781,33 +936,31 @@ def run_prediction(img_bgr, field_mode=True, weather=None):
     severity = severity_proxy(img_bgr)
 
     if field_mode:
-        original        = cv2.resize(img_bgr, (448, 448))
-        enhanced        = enhance_field_image(original)
-        segmented, mask = segment_leaf_advanced(enhanced)
-        blur_score      = calculate_blur_score(segmented)
-        patches         = create_patches(segmented)
-
+        original = cv2.resize(img_bgr, (IMG_SIZE, IMG_SIZE))
+        enhanced = enhance_field_image(original)
+        img_rgb = cv2.cvtColor(enhanced, cv2.COLOR_BGR2RGB).astype(np.float32)
+        img_arr = np.expand_dims(img_rgb, axis=0)
         w_vec = normalise_weather_vector(weather) if weather else np.zeros(WEATHER_DIM, np.float32)
         w_arr = np.expand_dims(w_vec, axis=0)
 
-        patch_preds = []
-        for patch in patches:
-            patch_rgb = cv2.cvtColor(patch, cv2.COLOR_BGR2RGB).astype(np.float32)
-            patch_arr = np.expand_dims(patch_rgb, axis=0)
-            patch_preds.append(model.predict([patch_arr, w_arr], verbose=0)[0])
+        pred_enhanced = active_model.predict([img_arr, w_arr], verbose=0)[0]
 
-        mean_pred  = np.mean(patch_preds, axis=0)
-        class_idx  = int(np.argmax(mean_pred))
-        confidence = float(mean_pred[class_idx])
-        confidence = apply_confidence_penalty(confidence, blur_score)
-        all_probs  = {class_names[i]: float(mean_pred[i]) for i in range(len(class_names))}
+        # Also predict on raw original image to prevent CLAHE artifacts from shifting predictions
+        raw_rgb = cv2.cvtColor(original, cv2.COLOR_BGR2RGB).astype(np.float32)
+        pred_raw = active_model.predict([np.expand_dims(raw_rgb, axis=0), w_arr], verbose=0)[0]
+
+        # Ensemble combination: 65% enhanced field features + 35% raw features
+        pred = 0.65 * pred_enhanced + 0.35 * pred_raw
+        class_idx = int(np.argmax(pred))
+        confidence = float(pred[class_idx])
+        all_probs = {class_names[i]: float(pred[i]) for i in range(len(class_names))}
     else:
         img     = cv2.resize(img_bgr, (IMG_SIZE, IMG_SIZE))
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32)
         img_arr = np.expand_dims(img_rgb, axis=0)
         w_vec   = normalise_weather_vector(weather) if weather else np.zeros(WEATHER_DIM, np.float32)
         w_arr   = np.expand_dims(w_vec, axis=0)
-        pred      = model.predict([img_arr, w_arr], verbose=0)[0]
+        pred      = active_model.predict([img_arr, w_arr], verbose=0)[0]
         class_idx = int(np.argmax(pred))
         confidence = float(pred[class_idx])
         all_probs  = {class_names[i]: float(pred[i]) for i in range(len(class_names))}
@@ -838,6 +991,7 @@ def run_prediction(img_bgr, field_mode=True, weather=None):
         "advice"         : get_care_advice(best_class),
         "spread_risk"    : spread_risk,
         "mode"           : "field" if field_mode else "lab",
+        "architecture"   : used_arch,
         "live_weather"   : weather is not None,
         "demo_mode"      : False,
     }
@@ -920,8 +1074,9 @@ def predict():
         if weather_payload.get("success"):
             weather = weather_payload.get("weather")
 
+    model_choice = request.form.get("architecture") or request.args.get("arch")
     try:
-        result = run_prediction(img_bgr, field_mode=field_mode, weather=weather)
+        result = run_prediction(img_bgr, field_mode=field_mode, weather=weather, model_choice=model_choice)
         result["weather"] = weather
         return jsonify(result)
     except Exception as e:
@@ -969,13 +1124,14 @@ def batch_predict():
         if weather_payload.get("success"):
             session_weather = weather_payload.get("weather")
 
+    arch = request.form.get("architecture") or request.args.get("arch")
     items = []
     for idx, (label, file) in enumerate(zip(labels, uploaded_files)):
         img_bgr = decode_uploaded_image(file)
         if img_bgr is None:
             return jsonify({"error": f"Could not decode image for {label}. Use JPG or PNG."}), 400
 
-        result = predict_with_context(img_bgr, field_mode=field_mode, weather=session_weather)
+        result = predict_with_context(img_bgr, field_mode=field_mode, weather=session_weather, model_choice=arch)
         item = {
             "label": label,
             "index": idx + 1,
@@ -992,7 +1148,7 @@ def batch_predict():
         item["delta_from_previous"] = None if prev_score is None else round(item["severity_score"] - prev_score, 4)
         prev_score = item["severity_score"]
 
-    summary = batch_progress_summary(items)
+    summary = batch_progress_summary(items, weather=session_weather)
     overall_weather_note = None
     if session_weather:
         overall_weather_note = {
@@ -1073,6 +1229,7 @@ def list_records():
 
 
 @app.route("/api/records/save", methods=["POST"])
+@app.route("/api/records", methods=["POST"])
 def save_record():
     data = request.get_json(silent=True) or {}
     user_id = data.get("user_id", "guest").strip()
@@ -1086,26 +1243,35 @@ def save_record():
 
     record_id = data.get("record_id") or f"leaf_{uuid.uuid4().hex[:10]}"
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    day_num = parse_day_num(day_label) or 1
 
     pred_name = prediction_data.get("prediction", "Unknown")
     aff_pct = prediction_data.get("gradcam", {}).get("affected_pct", 0.0)
     sev_cat = prediction_data.get("gradcam", {}).get("category", prediction_data.get("severity", {}).get("severity", "Unknown"))
     gradcam_img = prediction_data.get("gradcam", {}).get("image")
+    weather_snap = prediction_data.get("weather")
 
-    # Initial timeline entry
+    # Initial baseline timeline entry
     initial_checkin = {
         "checkin_id": uuid.uuid4().hex[:8],
+        "day_number": day_num,
         "day_label": day_label,
+        "date": datetime.now().strftime("%Y-%m-%d"),
         "timestamp": now_str,
         "prediction": pred_name,
         "confidence": prediction_data.get("confidence", 0.0),
+        "confidence_pct": prediction_data.get("confidence_pct", 0.0),
         "affected_pct": aff_pct,
         "severity": sev_cat,
         "delta_from_previous": 0.0,
+        "rate_per_day": 0.0,
         "verdict": "BASELINE",
-        "explanation": "Initial baseline health assessment recorded.",
+        "status_tag": "🌱 Baseline Diagnosis",
+        "explanation": f"Baseline leaf health assessment recorded ({day_label}).",
         "gradcam_image": gradcam_img,
-        "notes": notes
+        "weather": weather_snap,
+        "notes": notes,
+        "advice": prediction_data.get("advice", "")
     }
 
     record = {
@@ -1118,7 +1284,9 @@ def save_record():
         "latest_affected_pct": aff_pct,
         "latest_severity": sev_cat,
         "latest_day": day_label,
+        "latest_day_number": day_num,
         "latest_verdict": "Baseline scan logged.",
+        "thumbnail": gradcam_img,
         "timeline": [initial_checkin],
         "notes": notes
     }
@@ -1139,7 +1307,7 @@ def get_record(record_id):
 def recheck_leaf(record_id):
     """
     Submits a new photo of an existing leaf (e.g. Day 7, Day 14),
-    runs diagnosis, compares against past scans, and updates timeline.
+    runs diagnosis, correlates days elapsed & weather, compares against past scans, and updates timeline.
     """
     rec = db_store.get_leaf_record(record_id)
     if not rec:
@@ -1157,15 +1325,16 @@ def recheck_leaf(record_id):
     notes = request.form.get("notes", "").strip()
     use_weather = request.form.get("use_weather", "false").lower() == "true"
     mode = request.form.get("mode", "field") == "field"
+    arch = request.form.get("architecture") or request.args.get("arch")
 
+    # Fetch live weather snapshot
     weather = None
-    if use_weather:
-        weather_payload = fetch_live_weather_snapshot()
-        if weather_payload.get("success"):
-            weather = weather_payload.get("weather")
+    weather_payload = fetch_live_weather_snapshot()
+    if weather_payload.get("success"):
+        weather = weather_payload.get("weather")
 
     # Run fresh prediction on the re-checked leaf
-    diag = run_prediction(img_bgr, field_mode=mode, weather=weather)
+    diag = run_prediction(img_bgr, field_mode=mode, weather=weather, model_choice=arch)
 
     # Compare with previous checkin
     timeline = rec.get("timeline", [])
@@ -1179,39 +1348,51 @@ def recheck_leaf(record_id):
     prev_pred = prev_entry.get("prediction", new_pred) if prev_entry else new_pred
     prev_aff  = float(prev_entry.get("affected_pct", new_aff)) if prev_entry else new_aff
 
-    delta = round(new_aff - prev_aff, 1)
+    # Parse day numbers
+    prev_day_num = parse_day_num(prev_entry.get("day_label", "Day 1")) if prev_entry else 1
+    curr_day_num = parse_day_num(day_label)
+    if curr_day_num is None:
+        curr_day_num = (prev_day_num or 1) + 7
+    days_elapsed = max(curr_day_num - (prev_day_num or 1), 1)
 
-    # Comparative progression analysis
-    if new_pred != prev_pred:
-        verdict = "NEW_DISEASE"
-        status_tag = "⚠️ Condition Shift"
-        expl = f"Diagnosis shifted from {prev_pred.replace('_',' ')} to {new_pred.replace('_',' ')}. Review treatment advice."
-    elif delta <= -4.0:
-        verdict = "IMPROVED"
-        status_tag = "🟢 Significant Healing"
-        expl = f"Lesion coverage reduced by {abs(delta)}% (from {prev_aff}% down to {new_aff}%). Therapeutic response confirmed."
-    elif delta >= 4.0:
-        verdict = "WORSENED"
-        status_tag = "🔴 Disease Progression"
-        expl = f"Lesion surface expanded by {delta}% (from {prev_aff}% to {new_aff}%). Consider aggressive fungicide or canopy pruning."
-    else:
-        verdict = "STABLE"
-        status_tag = "🟡 Stable / Monitored"
-        expl = f"Disease severity is steady (change of {delta}%). Continue ongoing monitoring."
+    # Weather & temporal epidemiological progression evaluation
+    prev_weather = prev_entry.get("weather") if prev_entry else None
+    eval_res = evaluate_weather_progression(
+        prev_weather=prev_weather,
+        curr_weather=weather,
+        days_elapsed=days_elapsed,
+        prev_pred=prev_pred,
+        curr_pred=new_pred,
+        prev_aff=prev_aff,
+        curr_aff=new_aff,
+        curr_day_label=day_label
+    )
+
+    verdict = eval_res["verdict"]
+    status_tag = eval_res["status_tag"]
+    expl = eval_res["explanation"]
+    delta = eval_res["delta"]
+    rate_per_day = eval_res["rate_per_day"]
 
     checkin_entry = {
         "checkin_id": uuid.uuid4().hex[:8],
+        "day_number": curr_day_num,
         "day_label": day_label,
+        "days_elapsed": days_elapsed,
+        "date": datetime.now().strftime("%Y-%m-%d"),
         "timestamp": now_str,
         "prediction": new_pred,
         "confidence": diag.get("confidence", 0.0),
+        "confidence_pct": diag.get("confidence_pct", 0.0),
         "affected_pct": new_aff,
         "severity": new_sev,
         "delta_from_previous": delta,
+        "rate_per_day": rate_per_day,
         "verdict": verdict,
         "status_tag": status_tag,
         "explanation": expl,
         "gradcam_image": diag.get("gradcam", {}).get("image"),
+        "weather": weather,
         "notes": notes,
         "advice": diag.get("advice", "")
     }
@@ -1222,9 +1403,12 @@ def recheck_leaf(record_id):
     rec["latest_affected_pct"] = new_aff
     rec["latest_severity"] = new_sev
     rec["latest_day"] = day_label
+    rec["latest_day_number"] = curr_day_num
     rec["latest_verdict"] = expl
 
     saved = db_store.save_leaf_record(rec)
+
+    prev_img = (prev_entry.get("gradcam_image") or rec.get("thumbnail")) if prev_entry else rec.get("thumbnail")
 
     return jsonify({
         "success": True,
@@ -1233,12 +1417,24 @@ def recheck_leaf(record_id):
         "diagnostic": diag,
         "comparison": {
             "previous_day": prev_entry.get("day_label", "Baseline") if prev_entry else "Baseline",
+            "previous_date": prev_entry.get("timestamp", "Initial Scan") if prev_entry else "Initial Scan",
+            "previous_image": prev_img,
             "previous_affected": prev_aff,
+            "previous_prediction": prev_pred,
+            "previous_weather": prev_weather,
+            "current_day": day_label,
+            "current_date": now_str,
+            "current_image": diag.get("gradcam", {}).get("image"),
             "current_affected": new_aff,
+            "current_prediction": new_pred,
+            "current_weather": weather,
+            "days_elapsed": days_elapsed,
+            "rate_per_day": rate_per_day,
             "delta": delta,
             "verdict": verdict,
             "status_tag": status_tag,
-            "explanation": expl
+            "explanation": expl,
+            "advice": diag.get("advice", "")
         }
     })
 
