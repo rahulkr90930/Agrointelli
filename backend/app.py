@@ -393,11 +393,14 @@ def auth_register():
 @app.route("/api/auth/login", methods=["POST"])
 def auth_login():
     data = request.get_json(silent=True) or {}
-    username = data.get("username", "").strip()
+    identifier = (data.get("identifier") or data.get("username") or data.get("email") or "").strip()
     password = data.get("password", "").strip()
 
+    if not identifier or not password:
+        return jsonify({"error": "Username/email and password required."}), 400
+
     from werkzeug.security import check_password_hash
-    user = db_store.get_user(username)
+    user = db_store.get_user(identifier)
     if not user or not check_password_hash(user.get("password_hash", ""), password):
         return jsonify({"error": "Invalid username or password."}), 401
 
