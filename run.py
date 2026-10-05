@@ -73,21 +73,30 @@ def open_frontend():
             pass
         time.sleep(0.5)
     
-    # In GitHub Codespaces or headless environments
-    if os.environ.get("CODESPACES") == "true":
-        print("🌐 AgroIntelli is running inside GitHub Codespaces! Open port 5000 to view the app.")
+    app_url = "http://127.0.0.1:5000/"
+
+    # Detect cloud headless environments (Codespaces, Replit, Binder, Gitpod, Docker)
+    is_headless_cloud = any(
+        os.environ.get(k) for k in [
+            "CODESPACES", "REPLIT_ENVIRONMENT", "REPL_ID", "BINDER_PORT", 
+            "JUPYTER_SERVER_URL", "GITPOD_WORKSPACE_ID"
+        ]
+    ) or not (sys.platform.startswith("win") or os.environ.get("DISPLAY"))
+
+    if is_headless_cloud:
+        print(f"🌐 AgroIntelli is live! Open port 5000 in your cloud platform to view the web app: {app_url}")
         return
 
-    frontend_path = os.path.abspath(os.path.join("frontend", "index.html"))
-    if os.path.exists(frontend_path):
-        browser_url = f"file:///{frontend_path.replace(os.sep, '/')}"
-        print(f"🌐 Backend is live! Opening frontend in your browser: {browser_url}")
-        try:
-            webbrowser.open(browser_url)
-        except Exception:
-            pass
-    else:
-        print(f"⚠ Warning: Could not find frontend at {frontend_path}")
+    print(f"🌐 Backend is live! Opening AgroIntelli web app: {app_url}")
+    try:
+        webbrowser.open(app_url)
+    except Exception:
+        frontend_path = os.path.abspath(os.path.join("frontend", "index.html"))
+        if os.path.exists(frontend_path):
+            try:
+                webbrowser.open(f"file:///{frontend_path.replace(os.sep, '/')}")
+            except Exception:
+                pass
 
 if __name__ == "__main__":
     try:

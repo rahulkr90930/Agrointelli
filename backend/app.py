@@ -60,19 +60,15 @@ load_model()
 
 @app.route("/", methods=["GET"])
 def home():
-    # If opened by a web browser, serve the interactive AgroIntelli web application
-    if "text/html" in request.headers.get("Accept", ""):
-        frontend_file = Path(__file__).parent.parent / "frontend" / "index.html"
-        if frontend_file.exists():
-            from flask import send_file
-            return send_file(str(frontend_file))
-    return jsonify({
-        "name": "AgroIntelli Modular API",
-        "status": "online",
-        "modules": ["database", "weather", "gradcam", "inference", "batch"],
-        "models_available": list(available_models.keys()),
-        "mongo_connected": db_store.is_mongo
-    })
+    """
+    Root route: Unconditionally serves the interactive AgroIntelli Web Application.
+    Guarantees that Local, GitHub Codespaces, Replit, Binder, and Docker always load the UI directly.
+    """
+    frontend_file = Path(__file__).parent.parent / "frontend" / "index.html"
+    if frontend_file.exists():
+        from flask import send_file
+        return send_file(str(frontend_file))
+    return jsonify({"error": "frontend/index.html not found"}), 404
 
 
 @app.route("/app", methods=["GET"])
@@ -80,6 +76,26 @@ def web_app():
     frontend_file = Path(__file__).parent.parent / "frontend" / "index.html"
     from flask import send_file
     return send_file(str(frontend_file))
+
+
+@app.route("/api", methods=["GET"])
+@app.route("/api/status", methods=["GET"])
+def api_status():
+    """Returns JSON API and model availability telemetry."""
+    try:
+        from .inference import available_models as av_models, class_names as c_names, TF_AVAILABLE as tf_avail, model as m
+    except (ImportError, ValueError):
+        from inference import available_models as av_models, class_names as c_names, TF_AVAILABLE as tf_avail, model as m
+
+    return jsonify({
+        "name": "AgroIntelli Modular API",
+        "status": "online",
+        "modules": ["database", "weather", "gradcam", "inference", "batch"],
+        "models_available": list(av_models.keys()),
+        "model_loaded": len(av_models) > 0 or m is not None,
+        "classes_count": len(c_names),
+        "mongo_connected": db_store.is_mongo
+    })
 
 
 @app.route("/health", methods=["GET"])
