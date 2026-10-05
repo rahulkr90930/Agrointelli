@@ -37,8 +37,19 @@ except (ImportError, ValueError):
 # Model & Asset Configurations
 MODEL_DIR   = Path(__file__).parent / "models"
 MODEL_PATH  = MODEL_DIR / "agrointelli_phase1_final.keras"
+BACKUP_MODEL_PATH = MODEL_DIR / "agrointelli_phase1_final.backup.keras"
 CLASS_MAP_PATH = MODEL_DIR / "class_index_map.json"
 CSV_KNOWLEDGE_PATH = Path(__file__).parent / "data" / "disease_knowledge.csv"
+
+DEFAULT_CLASSES = [
+    "corn_common_rust",
+    "potato_early_blight",
+    "potato_healthy",
+    "potato_late_blight",
+    "tomato_early_blight",
+    "tomato_healthy",
+    "tomato_late_blight",
+]
 
 IMG_SIZE    = 224
 WEATHER_DIM = 4
@@ -171,6 +182,17 @@ def load_model():
         except Exception as e:
             print(f"⚠  Failed to load {MODEL_PATH.name}: {e}")
 
+    # Fallback to previous backup model if primary fails or is missing
+    if model is None and BACKUP_MODEL_PATH.exists():
+        try:
+            print(f"🛡️ Attempting recovery from previous trained backup: {BACKUP_MODEL_PATH.name}...")
+            model = keras.models.load_model(str(BACKUP_MODEL_PATH), compile=False)
+            available_models["primary"] = model
+            available_models["mobilenet"] = model
+            print(f"✅ Recovered and serving from previous trained backup: {BACKUP_MODEL_PATH.name}")
+        except Exception as e:
+            print(f"⚠  Failed to load backup {BACKUP_MODEL_PATH.name}: {e}")
+
     # 2. Check for Architecture 2: EfficientNet-B0
     eff_model_path = MODEL_DIR / "model_efficientnet_b0.keras"
     if eff_model_path.exists():
@@ -192,14 +214,25 @@ def load_model():
     if model is None and available_models:
         model = list(available_models.values())[0]
 
+    # Load class mapping with default fallback
     if CLASS_MAP_PATH.exists():
-        with open(CLASS_MAP_PATH, "r", encoding="utf-8") as f:
-            loaded_map = json.load(f)
-            class_to_idx.clear()
-            class_to_idx.update(loaded_map)
+        try:
+            with open(CLASS_MAP_PATH, "r", encoding="utf-8") as f:
+                loaded_map = json.load(f)
+                class_to_idx.clear()
+                class_to_idx.update(loaded_map)
+            class_names.clear()
+            class_names.extend([k for k, v in sorted(class_to_idx.items(), key=lambda x: x[1])])
+            print(f"✅ Classes loaded: {class_names}")
+        except Exception as e:
+            print(f"⚠  Failed reading class map: {e}")
+
+    if not class_names:
+        print("ℹ️ Using default fallback class names.")
         class_names.clear()
-        class_names.extend([k for k, v in sorted(class_to_idx.items(), key=lambda x: x[1])])
-        print(f"✅ Classes loaded: {class_names}")
+        class_names.extend(DEFAULT_CLASSES)
+        class_to_idx.clear()
+        class_to_idx.update({cls_name: i for i, cls_name in enumerate(DEFAULT_CLASSES)})
 
     if model is not None:
         grad_model = build_gradcam_model(model)
