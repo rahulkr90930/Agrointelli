@@ -3323,9 +3323,32 @@
       return html;
     }
 
+    // Language Metadata & Keywords for Multilingual Voice Matching
+    const LANG_META = {
+      'hi-IN': { iso: 'hi', name: 'Hindi', native: 'हिंदी', keywords: ['hindi', 'हिन्दी', 'swara', 'kalpana', 'hemant', 'hi-in', 'hi_in'] },
+      'en-US': { iso: 'en', name: 'English', native: 'English', keywords: ['english', 'en-us', 'en_us', 'en-gb', 'david', 'zira', 'mark', 'google us'] },
+      'es-ES': { iso: 'es', name: 'Spanish', native: 'Español', keywords: ['spanish', 'español', 'sabina', 'helena', 'es-es', 'es_es', 'es-'] },
+      'bn-IN': { iso: 'bn', name: 'Bengali', native: 'বাংলা', keywords: ['bengali', 'বাংলা', 'bashkar', 'tanishaa', 'bn-in', 'bn_in', 'bn-'] },
+      'mr-IN': { iso: 'mr', name: 'Marathi', native: 'मराठी', keywords: ['marathi', 'मराठी', 'aarohi', 'mr-in', 'mr_in', 'mr-'] },
+      'pa-IN': { iso: 'pa', name: 'Punjabi', native: 'ਪੰਜਾਬੀ', keywords: ['punjabi', 'ਪੰਜਾਬੀ', 'pa-in', 'pa_in', 'pa-'] },
+      'ta-IN': { iso: 'ta', name: 'Tamil', native: 'தமிழ்', keywords: ['tamil', 'தமிழ்', 'valluvar', 'ta-in', 'ta_in', 'ta-'] },
+      'te-IN': { iso: 'te', name: 'Telugu', native: 'తెలుగు', keywords: ['telugu', 'తెలుగు', 'chitra', 'mohan', 'te-in', 'te_in', 'te-'] }
+    };
+
+    let cachedVoices = [];
+    function refreshVoices() {
+      if ('speechSynthesis' in window) {
+        cachedVoices = window.speechSynthesis.getVoices() || [];
+      }
+    }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = refreshVoices;
+      refreshVoices();
+    }
+
     // Clean Text for Speech Synthesis
     function cleanForSpeech(raw) {
-      return raw
+      return (raw || '')
         .replace(/###/g, '')
         .replace(/##/g, '')
         .replace(/#/g, '')
@@ -3339,7 +3362,16 @@
         .trim();
     }
 
+    let currentAudio = null;
+
     function stopSpeech() {
+      if (currentAudio) {
+        try {
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
+        } catch(e) {}
+        currentAudio = null;
+      }
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
@@ -3350,33 +3382,64 @@
       }
     }
 
-    function speakText(rawText, btnElement = null) {
-      if (!('speechSynthesis' in window)) {
-        alert('Voice readout is supported in modern browsers.');
-        return;
+    function splitIntoChunks(text, maxLen = 140) {
+      const sentences = text.split(/([।\.\?\!\n]+)/);
+      const chunks = [];
+      let cur = '';
+      for (let i = 0; i < sentences.length; i++) {
+        const s = sentences[i];
+        if ((cur + s).length <= maxLen) {
+          cur += s;
+        } else {
+          if (cur.trim()) chunks.push(cur.trim());
+          cur = s;
+        }
+      }
+      if (cur.trim()) chunks.push(cur.trim());
+      return chunks.length ? chunks : [text.slice(0, maxLen)];
+    }
+
+    function playCloudAudioStream(text, isoLang, onDone) {
+      const chunks = splitIntoChunks(text, 140);
+      let idx = 0;
+
+      function playNext() {
+        if (idx >= chunks.length) {
+          if (onDone) onDone();
+          return;
+        }
+        const piece = chunks[idx++];
+        const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(isoLang)}&client=tw-ob&q=${encodeURIComponent(piece)}`;
+        currentAudio = new Audio(url);
+        currentAudio.playbackRate = 1.0;
+        currentAudio.onended = playNext;
+        currentAudio.onerror = (e) => {
+          console.warn('TTS cloud audio stream error:', e);
+          if (onDone) onDone();
+        };
+        currentAudio.play().catch(err => {
+          console.warn('Audio play notice:', err);
+          if (onDone) onDone();
+        });
       }
 
-      // If already speaking this button, stop
-      if (currentSpeakingBtn === btnElement && window.speechSynthesis.speaking) {
+      playNext();
+    }
+
+    // Multilingual Voice Synthesis (Native OS Voice or High-Fidelity Cloud Stream Fallback)
+    function speakText(rawText, btnElement = null) {
+      if (currentSpeakingBtn === btnElement && (currentAudio || ('speechSynthesis' in window && window.speechSynthesis.speaking))) {
         stopSpeech();
         return;
       }
 
       stopSpeech();
 
-      const text = cleanForSpeech(rawText);
-      const utter = new SpeechSynthesisUtterance(text);
       const selOption = langSelect ? langSelect.options[langSelect.selectedIndex] : null;
       const langCode = selOption ? (selOption.getAttribute('data-code') || 'hi-IN') : 'hi-IN';
-
-      utter.lang = langCode;
-      utter.rate = 0.98;
-      utter.pitch = 1.0;
-
-      // Select voice matching language if available
-      const voices = window.speechSynthesis.getVoices();
-      const match = voices.find(v => v.lang === langCode || v.lang.startsWith(langCode.split('-')[0]));
-      if (match) utter.voice = match;
+      const meta = LANG_META[langCode] || { iso: langCode.split('-')[0], keywords: [] };
+      const text = cleanForSpeech(rawText);
+      if (!text) return;
 
       if (btnElement) {
         currentSpeakingBtn = btnElement;
@@ -3384,10 +3447,41 @@
         btnElement.classList.add('agro-speaking');
       }
 
-      utter.onend = () => stopSpeech();
-      utter.onerror = () => stopSpeech();
+      // 1. Try to find a matching native browser voice for this language
+      refreshVoices();
+      let matchedVoice = null;
+      if (cachedVoices.length > 0) {
+        matchedVoice = cachedVoices.find(v => {
+          const vl = (v.lang || '').toLowerCase().replace('_', '-');
+          return vl === langCode.toLowerCase() || vl.startsWith(meta.iso + '-');
+        });
+        if (!matchedVoice && meta.keywords) {
+          matchedVoice = cachedVoices.find(v => {
+            const full = `${v.name} ${v.lang}`.toLowerCase();
+            return meta.keywords.some(kw => full.includes(kw));
+          });
+        }
+      }
 
-      window.speechSynthesis.speak(utter);
+      // If target language is non-English, but the only local voice is English,
+      // Windows default TTS cannot pronounce Hindi/Devanagari.
+      // Automatically fallback to authentic native cloud TTS stream!
+      const isNonEnglish = meta.iso !== 'en';
+      const voiceIsEnglish = matchedVoice && (matchedVoice.lang || '').toLowerCase().startsWith('en');
+
+      if (matchedVoice && !(isNonEnglish && voiceIsEnglish)) {
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.voice = matchedVoice;
+        utter.lang = matchedVoice.lang || langCode;
+        utter.rate = 0.95;
+        utter.pitch = 1.0;
+        utter.onend = () => stopSpeech();
+        utter.onerror = () => stopSpeech();
+        window.speechSynthesis.speak(utter);
+      } else {
+        // Guaranteed native pronunciation in Hindi, Spanish, Bengali, Marathi, etc.
+        playCloudAudioStream(text, meta.iso, () => stopSpeech());
+      }
     }
 
     function appendUserMessage(text) {
@@ -3399,11 +3493,17 @@
       scrollChatToBottom();
     }
 
-    function appendBotMessage(text, modelUsed = null) {
+    function appendBotMessage(text, modelUsed = null, isHistorical = false) {
       if (!chatMsgs) return;
       const msgDiv = document.createElement('div');
       msgDiv.className = 'agro-msg agro-msg-bot';
-      const badge = modelUsed ? `<div class="agro-model-badge">⚡ ${modelUsed} Grounded</div>` : '';
+      
+      let badgeHtml = '';
+      if (isHistorical) {
+        badgeHtml = `<div class="agro-model-badge" style="background:rgba(16,185,129,0.18);color:#065f46;border-color:rgba(16,185,129,0.3);">🍃 MongoDB Record Grounded</div>`;
+      } else if (modelUsed) {
+        badgeHtml = `<div class="agro-model-badge">⚡ ${modelUsed} Grounded</div>`;
+      }
       
       const bubble = document.createElement('div');
       bubble.className = 'agro-bubble-bot';
@@ -3411,7 +3511,7 @@
         ${formatMarkdown(text)}
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;">
           <button class="agro-listen-btn" title="Listen to this advice">🔊 Listen</button>
-          ${badge}
+          ${badgeHtml}
         </div>
       `;
 
@@ -3425,7 +3525,7 @@
       chatMsgs.appendChild(msgDiv);
       scrollChatToBottom();
 
-      // If auto-speak enabled, automatically read aloud
+      // If auto-speak enabled, automatically read aloud in the chosen language
       if (autoSpeak) {
         speakText(text, listenBtn);
       }
@@ -3459,14 +3559,14 @@
         <div class="agro-msg agro-msg-bot">
           <div class="agro-bubble-bot">
             🌾 <strong>AgroBot AI Session Reset</strong><br/>
-            I am your specialized agronomic assistant. Ask me questions about active leaf disease diagnoses, chemical spray dosages, rain risks, or organic remedies!
+            I am your specialized agronomic assistant. Ask me questions about active leaf disease diagnoses, MongoDB past scan history, spray dosages, or organic remedies!
           </div>
         </div>
       `;
       chatHistory = [];
     }
 
-    // Voice Input Recognition Setup
+    // Voice Input Recognition Setup (Speech-to-Text)
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = null;
 
@@ -3509,6 +3609,7 @@
         recognition.stop();
         stopVoiceRecognition();
       } else {
+        stopSpeech();
         const selOption = langSelect ? langSelect.options[langSelect.selectedIndex] : null;
         const langCode = selOption ? (selOption.getAttribute('data-code') || 'hi-IN') : 'hi-IN';
         recognition.lang = langCode;
@@ -3531,6 +3632,113 @@
 
     if (chatMic) chatMic.addEventListener('click', toggleVoiceRecognition);
 
+    // Dynamic Quick Chips for Past Data & Language
+    function updateChipsForLanguage(plant = null, diag = null) {
+      const currentLang = langSelect ? langSelect.value : 'Hindi';
+      const chipContainer = document.querySelector('.agro-chat-chips');
+      if (!chipContainer) return;
+
+      if (plant && diag) {
+        // Grounded in past MongoDB records
+        if (currentLang === 'Hindi') {
+          chipContainer.innerHTML = `
+            <button class="agro-chip-btn" data-prompt="मेरे पिछले स्कैन (${plant} - ${diag}) का क्या नतीजा था?">📊 पिछले स्कैन का नतीजा</button>
+            <button class="agro-chip-btn" data-prompt="मेरी पिछली बीमारी (${diag}) के लिए कौन सा स्प्रे करें?">💧 दवा और स्प्रे डोज</button>
+            <button class="agro-chip-btn" data-prompt="क्या मेरी फसल में बीमारी फैलने का खतरा है?">🌧️ मौसम और फैलाव जोखिम</button>
+            <button class="agro-chip-btn" data-prompt="मेरे सभी पिछले मोंगोडीबी (MongoDB) रिकॉर्ड संक्षेप में बताएं।">📜 सभी पिछले रिकॉर्ड</button>
+          `;
+        } else if (currentLang === 'Spanish') {
+          chipContainer.innerHTML = `
+            <button class="agro-chip-btn" data-prompt="¿Cuál fue el resultado de mi último escaneo (${plant})?">📊 Último resultado</button>
+            <button class="agro-chip-btn" data-prompt="¿Qué tratamiento debo aplicar para ${diag}?">💧 Tratamiento sugerido</button>
+            <button class="agro-chip-btn" data-prompt="¿Qué riesgo climático existe para esta enfermedad?">🌧️ Riesgo climático</button>
+            <button class="agro-chip-btn" data-prompt="Resuma mi historial guardado de MongoDB.">📜 Historial guardado</button>
+          `;
+        } else {
+          chipContainer.innerHTML = `
+            <button class="agro-chip-btn" data-prompt="What was the result of my last scan for ${plant}?">📊 Last Scan Result</button>
+            <button class="agro-chip-btn" data-prompt="What chemical or organic spray is recommended for ${diag}?">💧 Recommended Spray</button>
+            <button class="agro-chip-btn" data-prompt="Is there any rain or weather risk for this disease?">🌧️ Weather Risk</button>
+            <button class="agro-chip-btn" data-prompt="Summarize all my past MongoDB scan records.">📜 All Past Records</button>
+          `;
+        }
+      } else {
+        // Standard live or general chips
+        if (currentLang === 'Hindi') {
+          chipContainer.innerHTML = `
+            <button class="agro-chip-btn" data-prompt="इस रोग के लिए आज कौन सी दवा का छिड़काव करें?">💧 कौन सी दवा छिड़कें?</button>
+            <button class="agro-chip-btn" data-prompt="बारिश और नमी से रोग फैलने का कितना खतरा है?">🌧️ बारिश और मौसम का जोखिम</button>
+            <button class="agro-chip-btn" data-prompt="नीम के तेल का जैविक उपचार और सही मात्रा बताएं।">🌿 नीम तेल जैविक उपाय</button>
+            <button class="agro-chip-btn" data-prompt="मेरे पिछले स्कैन के सभी रिकॉर्ड मोंगोडीबी (MongoDB) से दिखाएं।">📜 पिछले स्कैन रिकॉर्ड</button>
+          `;
+        } else if (currentLang === 'Spanish') {
+          chipContainer.innerHTML = `
+            <button class="agro-chip-btn" data-prompt="¿Qué fungicida se recomienda pulverizar hoy?">💧 Tratamiento químico</button>
+            <button class="agro-chip-btn" data-prompt="¿Cómo afecta el clima y lluvia a la infección?">🌧️ Riesgo de lluvia</button>
+            <button class="agro-chip-btn" data-prompt="¿Qué dosis de aceite de neem es recomendable?">🌿 Remedio orgánico</button>
+            <button class="agro-chip-btn" data-prompt="Mostrar mis registros guardados de MongoDB.">📜 Historial MongoDB</button>
+          `;
+        } else {
+          chipContainer.innerHTML = `
+            <button class="agro-chip-btn" data-prompt="What fungicide spray is recommended today?">💧 Spray Dosage</button>
+            <button class="agro-chip-btn" data-prompt="How does humidity and rain affect spore spread?">🌧️ Weather Risk</button>
+            <button class="agro-chip-btn" data-prompt="What is the organic neem oil recipe and dosage?">🌿 Organic Recipe</button>
+            <button class="agro-chip-btn" data-prompt="Show my past crop scan records from MongoDB.">📜 Past MongoDB Records</button>
+          `;
+        }
+      }
+
+      chipContainer.querySelectorAll('.agro-chip-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const prompt = btn.getAttribute('data-prompt');
+          if (prompt) sendMessage(prompt);
+        });
+      });
+    }
+
+    // Inspect MongoDB for Past Scans when No Photo is Uploaded
+    async function checkMongoDBRecordsForChat() {
+      if (typeof lastScanResult !== 'undefined' && lastScanResult && lastScanResult.prediction) {
+        return; // Active photo scan takes priority
+      }
+      try {
+        const uid = (typeof getCurrentUserId === 'function') ? getCurrentUserId() : 'guest';
+        const res = await fetch(`${API}/api/records?user_id=${encodeURIComponent(uid)}`);
+        const data = await res.json();
+        if (data.success && data.records && data.records.length > 0) {
+          const latest = data.records[0];
+          const plant = latest.plant_name || 'Tracked Crop';
+          const diag = (latest.status || 'Disease Record').replace(/_/g, ' ');
+          if (ctxText) {
+            ctxText.innerHTML = `<span>🍃 MongoDB Field Journal: <strong>${plant}</strong> (${diag})</span>`;
+          }
+          if (ctxIcon) ctxIcon.textContent = '🍃';
+          if (chatBadge) {
+            chatBadge.style.display = 'flex';
+            chatBadge.textContent = '📜';
+          }
+          updateChipsForLanguage(plant, diag);
+        } else {
+          if (ctxText) ctxText.textContent = 'No photo uploaded • General agricultural consultation';
+          if (ctxIcon) ctxIcon.textContent = 'ℹ️';
+          updateChipsForLanguage();
+        }
+      } catch (e) {
+        console.warn('MongoDB check notice:', e);
+        updateChipsForLanguage();
+      }
+    }
+
+    if (langSelect) {
+      langSelect.addEventListener('change', () => {
+        stopSpeech();
+        const selOption = langSelect.options[langSelect.selectedIndex];
+        const langCode = selOption ? (selOption.getAttribute('data-code') || 'hi-IN') : 'hi-IN';
+        if (recognition) recognition.lang = langCode;
+        checkMongoDBRecordsForChat();
+      });
+    }
+
     // Send Message Logic
     async function sendMessage(text) {
       const msg = (text || (chatInput ? chatInput.value : '') || '').trim();
@@ -3540,7 +3748,7 @@
       appendUserMessage(msg);
 
       let scanCtx = {};
-      if (typeof lastScanResult !== 'undefined' && lastScanResult) {
+      if (typeof lastScanResult !== 'undefined' && lastScanResult && lastScanResult.prediction) {
         scanCtx = {
           prediction: lastScanResult.prediction,
           confidence_pct: lastScanResult.confidence_pct || (lastScanResult.confidence ? Math.round(lastScanResult.confidence * 100) : 0),
@@ -3551,6 +3759,7 @@
       }
 
       const currentLang = langSelect ? langSelect.value : 'Hindi';
+      const uid = (typeof getCurrentUserId === 'function') ? getCurrentUserId() : 'guest';
 
       isWaiting = true;
       if (chatSend) chatSend.disabled = true;
@@ -3564,6 +3773,7 @@
             message: msg,
             context: scanCtx,
             language: currentLang,
+            user_id: uid,
             history: chatHistory.slice(-6)
           })
         });
@@ -3572,9 +3782,15 @@
         removeTypingIndicator();
 
         if (res.ok && data.success) {
-          appendBotMessage(data.reply, data.model_used);
+          appendBotMessage(data.reply, data.model_used, data.is_historical);
           chatHistory.push({ role: 'user', text: msg });
           chatHistory.push({ role: 'model', text: data.reply });
+
+          // If response used MongoDB history when no photo was uploaded, update context pill
+          if (data.is_historical && data.latest_crop && ctxText) {
+            ctxText.innerHTML = `<span>🍃 MongoDB Field Journal: <strong>${data.latest_crop}</strong></span>`;
+            if (ctxIcon) ctxIcon.textContent = '🍃';
+          }
         } else {
           appendBotMessage(`⚠️ ${data.error || 'Could not retrieve advice from knowledge engine.'}`);
         }
@@ -3598,13 +3814,8 @@
       });
     }
 
-    // Chips
-    chipBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const prompt = btn.getAttribute('data-prompt');
-        if (prompt) sendMessage(prompt);
-      });
-    });
+    // Initial check on load
+    checkMongoDBRecordsForChat();
 
   })();
 </script>

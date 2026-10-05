@@ -140,7 +140,8 @@ def get_disease_knowledge(disease_id):
 def chat():
     """
     POST /api/chat
-    Agronomic chatbot query grounded in live leaf diagnosis, Grad-CAM, weather, and knowledge base.
+    Agronomic chatbot query grounded in live leaf diagnosis or MongoDB historical records,
+    Grad-CAM lesion coverage, weather, and scientific knowledge base.
     """
     data = request.get_json(silent=True) or {}
     message = data.get("message", "").strip()
@@ -149,9 +150,65 @@ def chat():
 
     context = data.get("context", {}) or {}
     history = data.get("history", [])
+    user_id = data.get("user_id") or request.headers.get("X-User-Id") or "guest"
+
+    # Query MongoDB for user's past records
+    try:
+        from .database import db_store
+    except (ImportError, ValueError):
+        from database import db_store
+
+    user_records = []
+    try:
+        user_records = db_store.get_user_records(user_id)
+        if not user_records and user_id != "guest":
+            user_records = db_store.get_user_records("guest")
+    except Exception as e:
+        print(f"MongoDB past records retrieval notice: {e}")
+
+    # Build MongoDB history summary
+    if user_records:
+        history_lines = []
+        for i, rec in enumerate(user_records[:6], 1):
+            p_name = rec.get("plant_name", "Unknown Crop")
+            status = rec.get("status", "Unknown Condition")
+            up_at = (rec.get("updated_at") or "")[:10]
+            timeline = rec.get("timeline", [])
+            timeline_str = ""
+            if timeline:
+                latest_entry = timeline[-1]
+                pred_label = latest_entry.get("prediction", status)
+                conf = latest_entry.get("confidence_pct", 0)
+                aff = latest_entry.get("affected_pct")
+                aff_str = f", Lesion: {aff:.1f}%" if aff is not None else ""
+                w = latest_entry.get("weather") or {}
+                w_str = f", {w.get('temp_c')}°C {w.get('humidity_pct')}% hum" if w else ""
+                timeline_str = f" [Check-ins: {len(timeline)} | Latest: {pred_label} ({conf:.0f}% conf{aff_str}{w_str})]"
+            history_lines.append(f"{i}. Date: {up_at} | Plant: {p_name} | Disease: {status}{timeline_str}")
+
+        context["mongo_history_summary"] = "\n".join(history_lines)
+        context["mongo_records_count"] = len(user_records)
+
+    # If NO live photo is uploaded, ground chatbot using the latest MongoDB record
+    pred = context.get("prediction")
+    if not pred and user_records:
+        latest_rec = user_records[0]
+        context["is_historical"] = True
+        context["plant_name"] = latest_rec.get("plant_name", "Tracked Crop")
+        timeline = latest_rec.get("timeline", [])
+        if timeline:
+            latest_entry = timeline[-1]
+            pred = latest_entry.get("prediction") or latest_rec.get("status")
+            context["prediction"] = pred
+            context["confidence_pct"] = latest_entry.get("confidence_pct", 90)
+            context["affected_pct"] = latest_entry.get("affected_pct", None)
+            context["weather"] = latest_entry.get("weather") or {}
+            context["timeline_notes"] = f"Tracked across {len(timeline)} check-ins in MongoDB ({latest_rec.get('plant_name')})"
+        else:
+            pred = latest_rec.get("status")
+            context["prediction"] = pred
 
     # Automatically enrich with scientific knowledge base from CSV
-    pred = context.get("prediction")
     if pred and "knowledge_record" not in context:
         try:
             from .inference import get_knowledge_record
@@ -174,7 +231,11 @@ def chat():
         "reply": result["reply"],
         "grounded": result["grounded"],
         "model_used": result["model_used"],
-        "language": language
+        "language": language,
+        "used_mongo_history": bool(user_records),
+        "is_historical": context.get("is_historical", False),
+        "mongo_records_count": len(user_records),
+        "latest_crop": user_records[0].get("plant_name") if user_records else None
     })
 
 

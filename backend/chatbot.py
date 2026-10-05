@@ -58,12 +58,16 @@ CRITICAL RULES:
    - Grad-CAM affected lesion area percentage (% of leaf blade covered)
    - Live Weather Telemetry (temperature, relative humidity %, rainfall mm/h, wind)
    - Canonical Knowledge Profile (pathogen taxonomy, chemical treatments, organic remedies, prevention)
-3. GROUNDED AGRONOMIC REASONING:
+3. MONGODB SCAN JOURNAL & NO-PHOTO ACCESS:
+   - You have direct access to the farmer's MongoDB crop database.
+   - When the user asks about their previous scans, past diseases, or progression, synthesize their MongoDB scan journal.
+   - If NO new photo is uploaded, ground your consultation on their latest recorded scan from MongoDB, stating clearly that you are accessing their past field records from MongoDB.
+4. GROUNDED AGRONOMIC REASONING:
    - When humidity is high (>=70%) or rain is present, explain how free moisture promotes spore germination and bacterial splash dispersal.
    - For chemical treatments, recommend standard agricultural concentrations (e.g., Mancozeb 2-2.5 g/L, Chlorothalonil 2 ml/L, Copper Oxychloride 3 g/L) and emphasize proper application timing (early morning or late afternoon to prevent phytotoxicity/sun scorch).
    - Offer organic / biological alternatives (e.g., cold-pressed neem oil 5 ml/L with mild surfactant, Trichoderma viride, dilute potassium bicarbonate).
    - If progression data is provided (e.g., Day 1 to Day 5 with spread rate), explicitly evaluate whether the infection is expanding or under control.
-4. TONE & STRUCTURE:
+5. TONE & STRUCTURE:
    - Structured, concise, and clear with bullet points and bold highlights.
    - Action-oriented: Provide immediate containment steps, spray schedule, and future preventative practices.
 """
@@ -83,16 +87,16 @@ FAST_GEN_CONFIG = {
 
 def generate_chat_response(user_message, scan_context=None, history=None, language="English"):
     """
-    Generate an ultra-fast agronomic response grounded in scan telemetry,
+    Generate an ultra-fast agronomic response grounded in live or MongoDB historical telemetry,
     disease knowledge, and requested language (English, Hindi, Spanish, etc.).
     """
     if not user_message or not user_message.strip():
         welcome_msgs = {
-            "Hindi": "नमस्ते! मैं एग्रोबॉट हूँ, आपका कृषि सहायक। पत्ती स्कैन करें या फसल रोग, दवा छिड़काव और मौसम जोखिम के बारे में पूछें।",
-            "Spanish": "¡Hola! Soy AgroBot, su asistente de salud vegetal. Escanee una hoja o consulte sobre enfermedades y tratamientos.",
+            "Hindi": "नमस्ते! मैं एग्रोबॉट हूँ, आपका कृषि सहायक। पत्ती स्कैन करें, अपने मोंगोडीबी (MongoDB) के पिछले रिकॉर्ड देखें या फसल रोग, दवा छिड़काव और मौसम जोखिम के बारे में पूछें।",
+            "Spanish": "¡Hola! Soy AgroBot, su asistente de salud vegetal. Escanee una hoja, revise sus registros pasados de MongoDB o consulte sobre tratamientos.",
         }
         return {
-            "reply": welcome_msgs.get(language, "Hello! I am AgroBot, your plant health assistant. Scan a leaf or ask me anything about crop diseases, treatment sprays, or weather risks."),
+            "reply": welcome_msgs.get(language, "Hello! I am AgroBot, your plant health assistant. Scan a leaf, access your past MongoDB crop records, or ask me anything about crop diseases and treatment sprays."),
             "grounded": False,
             "model_used": "system"
         }
@@ -104,6 +108,9 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
     weather = scan_context.get("weather", {})
     knowledge = scan_context.get("knowledge_record", {})
     timeline = scan_context.get("timeline_notes", "")
+    mongo_summary = scan_context.get("mongo_history_summary", "")
+    is_historical = scan_context.get("is_historical", False)
+    plant_name = scan_context.get("plant_name", "")
 
     # Format telemetry block
     weather_desc = "Not provided"
@@ -125,22 +132,34 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
             f"Prevention: {knowledge.get('prevention', 'N/A')}"
         )
 
+    data_source_note = "LIVE SCAN"
+    if is_historical:
+        data_source_note = f"PAST MONGODB RECORD (Crop: {plant_name}, No photo currently uploaded)"
+
+    mongo_block = ""
+    if mongo_summary:
+        mongo_block = f"""
+[FARMER MONGODB CROP JOURNAL & PAST SCANS]
+{mongo_summary}
+"""
+
     context_prompt = f"""
-[CURRENT SCAN TELEMETRY & CONTEXT]
+[DIAGNOSTIC TELEMETRY & CONTEXT - SOURCE: {data_source_note}]
 - Plant / Leaf Diagnosis: {pred} ({conf}% confidence)
 - Grad-CAM Affected Lesion Area: {f"{aff_pct:.1f}%" if aff_pct is not None else "Not calculated"}
 - Microclimate Weather: {weather_desc}
 - Progression Timeline: {timeline if timeline else "Single scan baseline"}
 - Scientific Knowledge Grounding:
 {knowledge_summary}
-
+{mongo_block}
 [FARMER QUESTION]
 "{user_message}"
 
 [RESPONSE REQUIREMENTS]
 1. Target Language: {language}. Write naturally in {language} (use proper native script, e.g., Devanagari for Hindi).
-2. Keep the advice concise, fast, and structured in 3-4 bullet points.
-3. Include specific chemical spray dosage (g/L) or organic recipe, rain precautions, and timing.
+2. If answering based on past MongoDB data or if no photo was uploaded, acknowledge that you are reviewing their saved MongoDB field records.
+3. Keep the advice concise, fast, and structured in 3-4 bullet points.
+4. Include specific chemical spray dosage (g/L) or organic recipe, rain precautions, and timing.
 """
 
     # Try fast model candidates in sequence
@@ -162,7 +181,10 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
                 continue
 
     # Fallback to local rule-grounded reasoning if offline / API error
-    fallback_reply = _build_local_grounded_reply(user_message, pred, aff_pct, weather, knowledge, language=language)
+    fallback_reply = _build_local_grounded_reply(
+        user_message, pred, aff_pct, weather, knowledge,
+        language=language, is_historical=is_historical, plant_name=plant_name, mongo_summary=mongo_summary
+    )
     return {
         "reply": fallback_reply,
         "grounded": True,
@@ -170,10 +192,10 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
     }
 
 
-def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, language="English"):
-    """Generates an immediate, high-quality agronomic response using local knowledge."""
+def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, language="English", is_historical=False, plant_name="", mongo_summary=""):
+    """Generates an immediate, high-quality agronomic response using local knowledge and MongoDB history."""
     q_lower = query.lower()
-    crop = knowledge.get("crop", "your crop")
+    crop = plant_name or knowledge.get("crop", "your crop")
     disease = knowledge.get("common_name", pred.replace("_", " ").title())
     pathogen = knowledge.get("pathogen", "fungal/bacterial pathogen")
     chem = knowledge.get("treatment_protocol", "Apply a broad-spectrum protective fungicide (e.g., Mancozeb or Chlorothalonil).")
@@ -186,10 +208,12 @@ def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, langua
 
     aff_str = f"covering approximately **{aff_pct:.1f}%** of the leaf surface" if aff_pct is not None else ""
 
+    source_prefix = "### 🍃 AgroIntelli Historical Field Record (From MongoDB)\n\n" if is_historical else ""
+
     if any(k in q_lower for k in ["spray", "chemical", "medicine", "treatment", "cure", "fungicide"]):
         return (
-            f"### 🛡️ Recommended Treatment Protocol for **{disease}** ({pathogen})\n\n"
-            f"Based on your scan {aff_str}:\n\n"
+            f"{source_prefix}### 🛡️ Recommended Treatment Protocol for **{disease}** ({pathogen})\n\n"
+            f"Based on your {'saved MongoDB' if is_historical else 'latest'} scan {aff_str}:\n\n"
             f"1. **Chemical Treatment**:\n   - {chem}\n"
             f"   - *Application Tip*: Spray early in the morning (before 9 AM) or late afternoon. Ensure full coverage on both upper and lower leaf surfaces.\n\n"
             f"2. **Weather Considerations**:\n   - Current conditions: **{temp}°C, {hum}% humidity, {rain} mm/h rain**.\n"
@@ -199,7 +223,7 @@ def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, langua
 
     if any(k in q_lower for k in ["organic", "natural", "home", "bio", "neem"]):
         return (
-            f"### 🌿 Organic & Biological Solutions for **{disease}**\n\n"
+            f"{source_prefix}### 🌿 Organic & Biological Solutions for **{disease}**\n\n"
             f"For sustainable, chemical-free management:\n\n"
             f"1. **Organic Formulations**:\n   - {organic}\n"
             f"   - *Neem Oil Recipe*: Mix 5 ml pure cold-pressed neem oil + 1 ml liquid soap in 1 liter of warm water. Spray every 5 days.\n\n"
@@ -207,10 +231,22 @@ def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, langua
             f"3. **Prevention**:\n   - {prevention}"
         )
 
+    if any(k in q_lower for k in ["past", "history", "mongo", "previous", "record", "purani", "pichla"]):
+        history_info = f"\n\n**Your MongoDB Saved Records**:\n{mongo_summary}" if mongo_summary else ""
+        return (
+            f"### 📜 AgroIntelli Field Journal (MongoDB Scan Records)\n\n"
+            f"Here is your historical crop health journal retrieved from MongoDB:\n"
+            f"- **Latest Saved Crop**: **{crop}**\n"
+            f"- **Condition Diagnosed**: **{disease}** (*{pathogen}*)\n"
+            f"{f'- **Lesion Area**: {aff_pct:.1f}%' if aff_pct is not None else ''}"
+            f"{history_info}\n\n"
+            f"**Recommended Next Step**: Continue fungicide/organic preventive spray and check in with a new leaf photo to monitor progression."
+        )
+
     if any(k in q_lower for k in ["rain", "weather", "humidity", "temperature", "climate"]):
         risk = "HIGH" if (hum >= 75 or rain > 0) else "MODERATE"
         return (
-            f"### 🌦️ Microclimate Disease Risk Analysis\n\n"
+            f"{source_prefix}### 🌦️ Microclimate Disease Risk Analysis\n\n"
             f"Current field readings: **{temp}°C | {hum}% Humidity | {rain} mm/h Rain**.\n\n"
             f"- **Spore Germination Risk**: **{risk}**\n"
             f"- Pathogen: *{pathogen}*.\n"
@@ -220,7 +256,7 @@ def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, langua
 
     # General diagnosis breakdown
     return (
-        f"### 🌾 AgroIntelli Agronomic Consultation\n\n"
+        f"{source_prefix}### 🌾 AgroIntelli Agronomic Consultation\n\n"
         f"**Diagnosed Condition**: **{disease}** (*{pathogen}*)\n"
         f"{f'- **Lesion Severity**: {aff_pct:.1f}% affected leaf tissue.' if aff_pct is not None else ''}\n"
         f"- **Field Conditions**: {temp}°C, {hum}% humidity.\n\n"
