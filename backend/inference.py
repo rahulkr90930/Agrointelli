@@ -2,12 +2,23 @@
 AgroIntelli — Deep Learning Inference & Diagnostic Pipeline
 Manages dual-architecture models (MobileNetV3 and EfficientNet-B0),
 field illumination compensation, prediction ensemble, and agronomic care advice.
+Loads structured disease knowledge from CSV for explainability and chatbot integration.
 """
 
+import os
+import sys
+import csv
 import json
 from pathlib import Path
 import cv2
 import numpy as np
+
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass
 
 try:
     import tensorflow as tf
@@ -28,6 +39,7 @@ MODEL_DIR   = Path(__file__).parent / "models"
 MODEL_PATH  = MODEL_DIR / "agrointelli_phase1_final.keras"
 CLASS_MAP_PATH = MODEL_DIR / "class_index_map.json"
 ADVICE_PATH = MODEL_DIR / "advice.json"
+CSV_KNOWLEDGE_PATH = Path(__file__).parent / "data" / "disease_knowledge.csv"
 
 IMG_SIZE    = 224
 WEATHER_DIM = 4
@@ -39,6 +51,106 @@ available_models = {}
 class_names = []
 class_to_idx = {}
 advice_map = {}
+
+KNOWLEDGE_STORE = {}
+DISEASE_RISK_RULES = {}
+HEALTHY_CLASSES = set()
+ADVICE_RULES = []
+
+
+def load_knowledge_base():
+    """
+    Loads disease knowledge, risk rules, and agronomic treatment protocols from CSV.
+    Enables zero-code knowledge updates and seamless sharing with AI chatbots.
+    """
+    global KNOWLEDGE_STORE, DISEASE_RISK_RULES, HEALTHY_CLASSES, ADVICE_RULES
+
+    fallback_risk = {
+        "tomato_early_blight":   {"temp_range": (20, 30), "humidity_min": 60, "rain_sensitive": False, "description": "Alternaria solani: warm and humid conditions accelerate lesion spread."},
+        "tomato_late_blight":    {"temp_range": (10, 25), "humidity_min": 80, "rain_sensitive": True,  "description": "Phytophthora infestans: cool, moist nights are highest-risk windows."},
+        "potato_early_blight":   {"temp_range": (20, 30), "humidity_min": 60, "rain_sensitive": False, "description": "Mirrors tomato early blight; warm days and humid nights ideal for Alternaria."},
+        "potato_late_blight":    {"temp_range": (10, 25), "humidity_min": 80, "rain_sensitive": True,  "description": "Same pathogen as tomato late blight. Rain dramatically increases spread."},
+        "pepper_bacterial_spot": {"temp_range": (24, 32), "humidity_min": 70, "rain_sensitive": True,  "description": "Xanthomonas: warm temperatures and rain create splash dispersal of bacteria."},
+        "corn_common_rust":      {"temp_range": (16, 25), "humidity_min": 70, "rain_sensitive": False, "description": "Puccinia sorghi: moderate temps and humid nights accelerate spore germination."},
+    }
+    fallback_advice = [
+        ("early_blight", "Apply protectant fungicide (mancozeb, chlorothalonil). Remove lower infected leaves. Maintain dry canopy."),
+        ("late_blight",  "Act immediately — late blight spreads rapidly. Apply systemic fungicide within 24 hours."),
+        ("blight",       "Remove infected leaves and avoid overhead watering. Apply copper-based fungicide."),
+        ("bacterial",    "Avoid overhead irrigation. Remove affected tissue. Apply copper bactericide."),
+        ("rust",         "Improve field airflow. Monitor spread daily. Apply fungicide at first new lesions."),
+        ("healthy",      "No disease detected. Continue routine crop scouting every 3-5 days."),
+    ]
+
+    DISEASE_RISK_RULES.clear()
+    DISEASE_RISK_RULES.update(fallback_risk)
+    HEALTHY_CLASSES = {"tomato_healthy", "potato_healthy", "pepper_healthy", "corn_healthy"}
+    ADVICE_RULES.clear()
+    ADVICE_RULES.extend(fallback_advice)
+
+    if CSV_KNOWLEDGE_PATH.exists():
+        try:
+            with open(CSV_KNOWLEDGE_PATH, mode="r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                new_risk = {}
+                new_healthy = set()
+                new_advice = []
+                for row in reader:
+                    d_id = row.get("disease_id", "").strip()
+                    if not d_id:
+                        continue
+                    KNOWLEDGE_STORE[d_id] = {str(k): (str(v) if v is not None else "") for k, v in row.items() if k is not None}
+
+                    is_h = str(row.get("is_healthy", "False")).strip().lower() == "true"
+                    if is_h:
+                        new_healthy.add(d_id)
+
+                    t_min = float(row.get("temp_min", 20.0) or 20.0)
+                    t_max = float(row.get("temp_max", 30.0) or 30.0)
+                    h_min = float(row.get("humidity_min", 65.0) or 65.0)
+                    rain_sens = str(row.get("rain_sensitive", "False")).strip().lower() == "true"
+                    desc = row.get("risk_description", "")
+
+                    new_risk[d_id] = {
+                        "temp_range": (t_min, t_max),
+                        "humidity_min": h_min,
+                        "rain_sensitive": rain_sens,
+                        "description": desc
+                    }
+
+                    treatment = row.get("treatment_protocol", "").strip()
+                    remedies = row.get("organic_remedies", "").strip()
+                    full_adv = f"{treatment} Organic / biological options: {remedies}" if (treatment and remedies) else (treatment or remedies)
+                    if full_adv:
+                        new_advice.append((d_id, full_adv))
+
+                if new_risk:
+                    DISEASE_RISK_RULES.clear()
+                    DISEASE_RISK_RULES.update(new_risk)
+                if new_healthy:
+                    HEALTHY_CLASSES = new_healthy
+                if new_advice:
+                    ADVICE_RULES.clear()
+                    ADVICE_RULES.extend(new_advice)
+                    ADVICE_RULES.extend(fallback_advice)
+
+            print(f"✅ Loaded {len(KNOWLEDGE_STORE)} disease profiles from CSV: {CSV_KNOWLEDGE_PATH.name}")
+        except Exception as e:
+            print(f"ℹ️ Could not load {CSV_KNOWLEDGE_PATH.name} ({e}), using default rules.")
+
+
+# Initialize knowledge base immediately
+load_knowledge_base()
+
+
+def get_knowledge_record(disease_id):
+    """Retrieve full knowledge dictionary for a given disease ID."""
+    return KNOWLEDGE_STORE.get(disease_id)
+
+
+def get_all_knowledge():
+    """Retrieve all disease knowledge entries for chatbots or frontend display."""
+    return KNOWLEDGE_STORE
 
 
 def load_model():
@@ -82,7 +194,7 @@ def load_model():
         model = list(available_models.values())[0]
 
     if CLASS_MAP_PATH.exists():
-        with open(CLASS_MAP_PATH) as f:
+        with open(CLASS_MAP_PATH, "r", encoding="utf-8") as f:
             loaded_map = json.load(f)
             class_to_idx.clear()
             class_to_idx.update(loaded_map)
@@ -91,9 +203,9 @@ def load_model():
         print(f"✅ Classes loaded: {class_names}")
 
     if ADVICE_PATH.exists():
-        with open(ADVICE_PATH) as f:
+        with open(ADVICE_PATH, "r", encoding="utf-8") as f:
             advice_map = json.load(f)
-        print(f"✅ Advice map loaded.")
+        print("✅ Advice map loaded.")
 
     if model is not None:
         grad_model = build_gradcam_model(model)
@@ -166,34 +278,17 @@ def severity_numeric(severity):
     return mapping.get(label, 0.0)
 
 
-DISEASE_RISK_RULES = {
-    "tomato_early_blight":   {"temp_range": (20, 30), "humidity_min": 60,  "rain_sensitive": False,
-                               "description": "Alternaria solani — warm + humid conditions accelerate lesion spread."},
-    "tomato_late_blight":    {"temp_range": (10, 25), "humidity_min": 80,  "rain_sensitive": True,
-                               "description": "Phytophthora infestans — cool, moist nights are highest-risk windows."},
-    "potato_early_blight":   {"temp_range": (20, 30), "humidity_min": 60,  "rain_sensitive": False,
-                               "description": "Mirrors tomato early blight; warm days + humid nights ideal for Alternaria."},
-    "potato_late_blight":    {"temp_range": (10, 25), "humidity_min": 80,  "rain_sensitive": True,
-                               "description": "Same pathogen as tomato late blight. Rain dramatically increases spread."},
-    "pepper_bacterial_spot": {"temp_range": (24, 32), "humidity_min": 70,  "rain_sensitive": True,
-                               "description": "Xanthomonas — warm + rain creates splash dispersal of bacteria."},
-    "corn_common_rust":      {"temp_range": (16, 25), "humidity_min": 70,  "rain_sensitive": False,
-                               "description": "Puccinia sorghi — moderate temps + humid nights accelerate urediniospore germination."},
-}
-
-HEALTHY_CLASSES = {"tomato_healthy", "potato_healthy", "pepper_healthy", "corn_healthy"}
-
-ADVICE_RULES = [
-    ("early_blight", "Apply protectant fungicide. Remove lower infected leaves. Maintain dry canopy."),
-    ("late_blight",  "Act immediately — late blight spreads very fast. Apply systemic fungicide within 24h."),
-    ("blight",       "Remove infected leaves and avoid overhead watering. Apply copper-based fungicide."),
-    ("bacterial",    "Avoid overhead irrigation. Remove affected tissue. Apply copper bactericide."),
-    ("rust",         "Improve field airflow. Monitor spread daily. Apply fungicide at first new lesions."),
-    ("healthy",      "No disease detected. Continue monitoring every 3–5 days."),
-]
-
-
 def get_care_advice(class_name):
+    """Fetches targeted agronomic treatment protocol from CSV knowledge base with rule fallback."""
+    if class_name in KNOWLEDGE_STORE:
+        rec = KNOWLEDGE_STORE[class_name]
+        treatment = rec.get("treatment_protocol", "").strip()
+        remedies = rec.get("organic_remedies", "").strip()
+        if treatment and remedies:
+            return f"{treatment} Organic / biological options: {remedies}"
+        elif treatment:
+            return treatment
+
     low = class_name.lower()
     for key, advice in ADVICE_RULES:
         if key in low:
@@ -265,7 +360,7 @@ def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None):
             "quality"        : image_quality_check(img_bgr),
             "severity"       : severity_proxy(img_bgr),
             "gradcam"        : demo_gc,
-            "advice"         : "Apply protectant fungicide. Remove lower infected leaves. Maintain dry canopy.",
+            "advice"         : get_care_advice("tomato_early_blight"),
             "spread_risk"    : None,
             "mode"           : "field" if field_mode else "lab",
             "architecture"   : used_arch,

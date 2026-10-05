@@ -11,6 +11,13 @@ from pathlib import Path
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass
+
 # Auto-load .env if available
 for candidate_env in [Path(__file__).parent.parent / ".env", Path(__file__).parent / ".env"]:
     if candidate_env.exists():

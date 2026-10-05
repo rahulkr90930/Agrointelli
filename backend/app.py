@@ -100,6 +100,42 @@ def get_weather():
     return jsonify(payload)
 
 
+# ── Agronomic Knowledge Base Endpoints (for Chatbots & LLM Agents) ────────────
+
+@app.route("/api/knowledge", methods=["GET"])
+def list_knowledge():
+    """
+    GET /api/knowledge
+    Exposes structured disease knowledge from CSV for external chatbots, RAG, and LLMs.
+    """
+    try:
+        from .inference import get_all_knowledge
+    except (ImportError, ValueError):
+        from inference import get_all_knowledge
+    store = get_all_knowledge()
+    return jsonify({
+        "success": True,
+        "count": len(store),
+        "knowledge": store
+    })
+
+
+@app.route("/api/knowledge/<disease_id>", methods=["GET"])
+def get_disease_knowledge(disease_id):
+    """
+    GET /api/knowledge/<disease_id>
+    Fetch complete treatment, organic remedies, pathogen, and environmental risks for a disease.
+    """
+    try:
+        from .inference import get_knowledge_record
+    except (ImportError, ValueError):
+        from inference import get_knowledge_record
+    rec = get_knowledge_record(disease_id)
+    if not rec:
+        return jsonify({"error": f"No knowledge record found for '{disease_id}'"}), 404
+    return jsonify({"success": True, "record": rec})
+
+
 # ── Diagnostics & Predictions ────────────────────────────────────────────────
 
 @app.route("/predict", methods=["POST"])

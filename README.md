@@ -38,6 +38,11 @@ Built as a final-year engineering capstone project, AgroIntelli empowers farmers
    - Records every inspection with `day_number`, date, timestamp, weather telemetry, Grad-CAM overlays, and compressed thumbnail images.
    - Full timeline history expandable per plant sample.
 
+7. **Externalized Knowledge Base & Future Chatbot/LLM Ready**:
+   - Disease risk rules, pathogen taxonomy, microclimate tolerances, chemical treatments, and organic remedies are decoupled into `backend/data/disease_knowledge.csv`.
+   - Modifiable directly in Excel or Google Sheets without touching Python code.
+   - Exposes REST endpoints (`GET /api/knowledge` and `GET /api/knowledge/<disease_id>`) for direct ingestion into RAG pipelines, LangChain, or LLM-based conversational chatbots.
+
 ---
 
 ## 📁 Repository Structure
@@ -51,6 +56,8 @@ AgroIntelli/
 │   ├── weather.py                 # Live Weather API integration & Microclimate Progression
 │   ├── batch.py                   # Multi-image Chronological Trajectory & Velocity Analysis
 │   ├── database.py                # MongoDB Atlas Cloud Persistence & User Authentication
+│   ├── data/
+│   │   └── disease_knowledge.csv  # Decoupled pathology, risk, treatment & organic remedy database
 │   └── models/                    # Model weights & label mappings (.gitkeep)
 ├── frontend/
 │   └── index.html                 # Single-page web application with responsive UI/UX
@@ -238,3 +245,7 @@ Returns backend status, loaded model architectures, and database connectivity.
 - `POST /api/records/save` — Persist a leaf scan with `plant_name`, `day_number`, `date`, `weather`, and image thumbnail.
 - `GET /api/records?user_id=<id>` — Fetch all tracked leaves for a user/guest.
 - `POST /api/records/<record_id>/checkin` — Submit a follow-up photo for an existing tracked leaf with custom `date` and `day_label`. Returns side-by-side images, dual Grad-CAM heatmaps, elapsed days, daily spread rate, and weather-correlated spread rationale.
+
+### Knowledge Base & Chatbot Data Access
+- `GET /api/knowledge` — Retrieve the full structured agronomic knowledge base (10 disease/healthy profiles) in JSON format.
+- `GET /api/knowledge/<disease_id>` — Fetch dedicated pathology profile (pathogen, microclimate thresholds, chemical treatments, organic remedies, prevention) for direct prompt injection into LLMs, LangChain, or agricultural chatbots.
