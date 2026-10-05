@@ -1582,6 +1582,7 @@
     if (typeof AbortSignal?.timeout === 'function') return AbortSignal.timeout(ms);
     const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal;
   }
+  let healthRetries = 0;
   async function checkHealth() {
     const pill = document.getElementById('status-pill');
     const txt  = document.getElementById('status-text');
@@ -1589,12 +1590,20 @@
       const r = await fetch(`${API}/health`, { signal: mkSignal(3500) });
       const d = await r.json();
       if (d.status === 'ok') {
+        healthRetries = 0;
         txt.textContent  = d.model_loaded ? 'Model Server Online' : 'Demo Mode Active';
         pill.className   = 'status-pill online';
       } else throw new Error();
     } catch {
-      txt.textContent = 'Backend Offline';
-      pill.className  = 'status-pill offline';
+      if (healthRetries < 8) {
+        healthRetries++;
+        txt.textContent = 'Connecting to Server…';
+        pill.className  = 'status-pill offline';
+        setTimeout(checkHealth, 1500);
+      } else {
+        txt.textContent = 'Backend Offline';
+        pill.className  = 'status-pill offline';
+      }
     }
   }
   checkHealth();
@@ -2729,230 +2738,6 @@
   document.getElementById('btn-open-from-bottom').addEventListener('click', openJournalModal);
   updateAuthUI();
 
-  /* ════════════════════════════════════════════════════════════
-     AGROBOT AI — MULTIMODAL GROUNDED CHATBOT WIDGET
-  ════════════════════════════════════════════════════════════ */
-  (function initAgroChatbot() {
-    let chatHistory = [];
-    let isWaiting = false;
-
-    const chatBtn = document.getElementById('agro-chat-fab');
-    const chatModal = document.getElementById('agro-chat-modal');
-    const chatClose = document.getElementById('agro-chat-close');
-    const chatClear = document.getElementById('agro-chat-clear');
-    const chatInput = document.getElementById('agro-chat-input');
-    const chatSend = document.getElementById('agro-chat-send');
-    const chatMsgs = document.getElementById('agro-chat-msgs');
-    const ctxText = document.getElementById('agro-ctx-text');
-    const ctxIcon = document.getElementById('agro-ctx-icon');
-    const chatBadge = document.getElementById('agro-chat-badge');
-    const chipBtns = document.querySelectorAll('.agro-chip-btn');
-
-    // Toggle Chat
-    function toggleChat(forceOpen = null) {
-      const willOpen = forceOpen !== null ? forceOpen : (chatModal.style.display !== 'flex');
-      if (willOpen) {
-        chatModal.style.display = 'flex';
-        setTimeout(() => chatModal.classList.add('agro-open'), 10);
-        chatBadge.style.display = 'none';
-        chatInput.focus();
-        scrollChatToBottom();
-      } else {
-        chatModal.classList.remove('agro-open');
-        setTimeout(() => { chatModal.style.display = 'none'; }, 220);
-      }
-    }
-
-    if (chatBtn) chatBtn.addEventListener('click', () => toggleChat());
-    if (chatClose) chatClose.addEventListener('click', () => toggleChat(false));
-    if (chatClear) chatClear.addEventListener('click', clearChat);
-
-    // Update Context from Scans
-    window.updateChatbotContext = function(d) {
-      if (!d) return;
-      const title = (d.prediction || 'Unknown').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-      const conf = d.confidence_pct || (d.confidence ? Math.round(d.confidence * 100) : 0);
-      const aff = d.gradcam?.affected_pct != null ? `${Number(d.gradcam.affected_pct).toFixed(1)}% Area` : '';
-      const w = d.weather;
-      const wStr = w ? `${w.temp_c || 25}°C, ${w.humidity_pct || 65}% Hum` : '';
-
-      const summaryParts = [title, conf ? `${conf}% Conf` : '', aff, wStr].filter(Boolean);
-      ctxText.textContent = `Active: ${summaryParts.join(' • ')}`;
-      ctxIcon.textContent = d.prediction?.includes('healthy') ? '🌿' : '🌾';
-
-      // Pulse notification on button
-      chatBadge.style.display = 'flex';
-      chatBadge.textContent = '1';
-
-      // Add a non-intrusive contextual prompt if chat area is empty
-      if (chatMsgs.children.length <= 1) {
-        appendBotMessage(`🔍 **New Scan Detected**: Diagnosed as **${title}** (${conf}% confidence)${aff ? ` with **${aff}** covered by lesions` : ''}. Ask me below for spray schedules, rain impact, or organic remedies!`);
-      }
-    };
-
-    // Scroll Helper
-    function scrollChatToBottom() {
-      chatMsgs.scrollTop = chatMsgs.scrollHeight;
-    }
-
-    // Simple Markdown to Safe HTML formatter
-    function formatMarkdown(text) {
-      if (!text) return '';
-      let html = text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-
-      // Headers (### )
-      html = html.replace(/^### (.*$)/gim, '<div style="font-weight:700;color:#064e3b;font-size:0.92rem;margin:8px 0 4px 0;">$1</div>');
-      html = html.replace(/^## (.*$)/gim, '<div style="font-weight:800;color:#064e3b;font-size:0.98rem;margin:10px 0 4px 0;">$1</div>');
-
-      // Bold and Italic
-      html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-      // Inline code
-      html = html.replace(/`(.*?)`/g, '<code style="background:rgba(16,185,129,0.1);color:#065f46;padding:1px 5px;border-radius:4px;font-size:0.84em;font-weight:600;">$1</code>');
-
-      // Lists
-      html = html.replace(/^\s*[\-\*]\s+(.*$)/gim, '<div style="display:flex;gap:6px;margin:2px 0 2px 8px;"><span style="color:#10b981;font-weight:700;">•</span><div>$1</div></div>');
-      html = html.replace(/^\s*(\d+)\.\s+(.*$)/gim, '<div style="display:flex;gap:6px;margin:2px 0 2px 8px;"><span style="color:#059669;font-weight:700;">$1.</span><div>$2</div></div>');
-
-      // Paragraphs
-      html = html.replace(/\n\n/g, '<div style="height:6px;"></div>');
-      html = html.replace(/\n/g, '<br/>');
-
-      return html;
-    }
-
-    function appendUserMessage(text) {
-      const msgDiv = document.createElement('div');
-      msgDiv.className = 'agro-msg agro-msg-user';
-      msgDiv.innerHTML = `<div class="agro-bubble-user">${formatMarkdown(text)}</div>`;
-      chatMsgs.appendChild(msgDiv);
-      scrollChatToBottom();
-    }
-
-    function appendBotMessage(text, modelUsed = null) {
-      const msgDiv = document.createElement('div');
-      msgDiv.className = 'agro-msg agro-msg-bot';
-      const badge = modelUsed ? `<div class="agro-model-badge">⚡ ${modelUsed} Grounded</div>` : '';
-      msgDiv.innerHTML = `
-        <div class="agro-bubble-bot">
-          ${formatMarkdown(text)}
-          ${badge}
-        </div>
-      `;
-      chatMsgs.appendChild(msgDiv);
-      scrollChatToBottom();
-    }
-
-    function showTypingIndicator() {
-      const ind = document.createElement('div');
-      ind.id = 'agro-typing-indicator';
-      ind.className = 'agro-msg agro-msg-bot';
-      ind.innerHTML = `
-        <div class="agro-typing-bubble">
-          <div class="agro-dot"></div>
-          <div class="agro-dot"></div>
-          <div class="agro-dot"></div>
-        </div>
-      `;
-      chatMsgs.appendChild(ind);
-      scrollChatToBottom();
-    }
-
-    function removeTypingIndicator() {
-      const ind = document.getElementById('agro-typing-indicator');
-      if (ind) ind.remove();
-    }
-
-    function clearChat() {
-      chatMsgs.innerHTML = `
-        <div class="agro-msg agro-msg-bot">
-          <div class="agro-bubble-bot">
-            🌾 <strong>AgroBot AI Session Reset</strong><br/>
-            I am your specialized agronomic assistant. Ask me questions about active leaf disease diagnoses, chemical spray dosages, rain risks, or organic remedies!
-          </div>
-        </div>
-      `;
-      chatHistory = [];
-    }
-
-    // Send logic
-    async function sendMessage(text) {
-      const msg = (text || chatInput.value || '').trim();
-      if (!msg || isWaiting) return;
-
-      chatInput.value = '';
-      appendUserMessage(msg);
-
-      // Context gathering
-      let scanCtx = {};
-      if (lastScanResult) {
-        scanCtx = {
-          prediction: lastScanResult.prediction,
-          confidence_pct: lastScanResult.confidence_pct || (lastScanResult.confidence ? Math.round(lastScanResult.confidence * 100) : 0),
-          affected_pct: lastScanResult.gradcam?.affected_pct,
-          weather: lastScanResult.weather || null,
-          timeline_notes: lastScanResult.spread_risk?.explanation || ''
-        };
-      }
-
-      isWaiting = true;
-      chatSend.disabled = true;
-      showTypingIndicator();
-
-      try {
-        const res = await fetch(`${API}/api/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: msg,
-            context: scanCtx,
-            history: chatHistory.slice(-6)
-          })
-        });
-
-        const data = await res.json();
-        removeTypingIndicator();
-
-        if (res.ok && data.success) {
-          appendBotMessage(data.reply, data.model_used);
-          chatHistory.push({ role: 'user', text: msg });
-          chatHistory.push({ role: 'model', text: data.reply });
-        } else {
-          appendBotMessage(`⚠️ ${data.error || 'Could not retrieve advice from knowledge engine.'}`);
-        }
-      } catch (err) {
-        removeTypingIndicator();
-        appendBotMessage(`⚠️ Connection notice: Backend service at ${API} is not responding. Ensure the Flask server is running.`);
-      } finally {
-        isWaiting = false;
-        chatSend.disabled = false;
-        chatInput.focus();
-      }
-    }
-
-    if (chatSend) chatSend.addEventListener('click', () => sendMessage());
-    if (chatInput) {
-      chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          sendMessage();
-        }
-      });
-    }
-
-    // Quick Chips click
-    chipBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const prompt = btn.getAttribute('data-prompt');
-        if (prompt) sendMessage(prompt);
-      });
-    });
-
-  })();
 </script>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -3349,5 +3134,239 @@
     </button>
   </div>
 </div>
+
+<script>
+  /* ════════════════════════════════════════════════════════════
+     AGROBOT AI — MULTIMODAL GROUNDED CHATBOT WIDGET LOGIC
+  ════════════════════════════════════════════════════════════ */
+  (function initAgroChatbot() {
+    let chatHistory = [];
+    let isWaiting = false;
+
+    const chatBtn = document.getElementById('agro-chat-fab');
+    const chatModal = document.getElementById('agro-chat-modal');
+    const chatClose = document.getElementById('agro-chat-close');
+    const chatClear = document.getElementById('agro-chat-clear');
+    const chatInput = document.getElementById('agro-chat-input');
+    const chatSend = document.getElementById('agro-chat-send');
+    const chatMsgs = document.getElementById('agro-chat-msgs');
+    const ctxText = document.getElementById('agro-ctx-text');
+    const ctxIcon = document.getElementById('agro-ctx-icon');
+    const chatBadge = document.getElementById('agro-chat-badge');
+    const chipBtns = document.querySelectorAll('.agro-chip-btn');
+
+    // Toggle Chat
+    function toggleChat(forceOpen = null) {
+      if (!chatModal) return;
+      const willOpen = forceOpen !== null ? forceOpen : (chatModal.style.display !== 'flex');
+      if (willOpen) {
+        chatModal.style.display = 'flex';
+        setTimeout(() => chatModal.classList.add('agro-open'), 10);
+        if (chatBadge) chatBadge.style.display = 'none';
+        if (chatInput) chatInput.focus();
+        scrollChatToBottom();
+      } else {
+        chatModal.classList.remove('agro-open');
+        setTimeout(() => { chatModal.style.display = 'none'; }, 220);
+      }
+    }
+
+    if (chatBtn) chatBtn.addEventListener('click', () => toggleChat());
+    if (chatClose) chatClose.addEventListener('click', () => toggleChat(false));
+    if (chatClear) chatClear.addEventListener('click', clearChat);
+
+    // Update Context from Scans
+    window.updateChatbotContext = function(d) {
+      if (!d || !ctxText) return;
+      const title = (d.prediction || 'Unknown').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const conf = d.confidence_pct || (d.confidence ? Math.round(d.confidence * 100) : 0);
+      const aff = d.gradcam?.affected_pct != null ? `${Number(d.gradcam.affected_pct).toFixed(1)}% Area` : '';
+      const w = d.weather;
+      const wStr = w ? `${w.temp_c || 25}°C, ${w.humidity_pct || 65}% Hum` : '';
+
+      const summaryParts = [title, conf ? `${conf}% Conf` : '', aff, wStr].filter(Boolean);
+      ctxText.textContent = `Active: ${summaryParts.join(' • ')}`;
+      if (ctxIcon) ctxIcon.textContent = d.prediction?.includes('healthy') ? '🌿' : '🌾';
+
+      // Pulse notification on button
+      if (chatBadge) {
+        chatBadge.style.display = 'flex';
+        chatBadge.textContent = '1';
+      }
+
+      // Add a non-intrusive contextual prompt if chat area is empty
+      if (chatMsgs && chatMsgs.children.length <= 1) {
+        appendBotMessage(`🔍 **New Scan Detected**: Diagnosed as **${title}** (${conf}% confidence)${aff ? ` with **${aff}** covered by lesions` : ''}. Ask me below for spray schedules, rain impact, or organic remedies!`);
+      }
+    };
+
+    // Scroll Helper
+    function scrollChatToBottom() {
+      if (chatMsgs) chatMsgs.scrollTop = chatMsgs.scrollHeight;
+    }
+
+    // Simple Markdown to Safe HTML formatter
+    function formatMarkdown(text) {
+      if (!text) return '';
+      let html = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      // Headers (### )
+      html = html.replace(/^### (.*$)/gim, '<div style="font-weight:700;color:#064e3b;font-size:0.92rem;margin:8px 0 4px 0;">$1</div>');
+      html = html.replace(/^## (.*$)/gim, '<div style="font-weight:800;color:#064e3b;font-size:0.98rem;margin:10px 0 4px 0;">$1</div>');
+
+      // Bold and Italic
+      html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+      // Inline code
+      html = html.replace(/`(.*?)`/g, '<code style="background:rgba(16,185,129,0.1);color:#065f46;padding:1px 5px;border-radius:4px;font-size:0.84em;font-weight:600;">$1</code>');
+
+      // Lists
+      html = html.replace(/^\s*[\-\*]\s+(.*$)/gim, '<div style="display:flex;gap:6px;margin:2px 0 2px 8px;"><span style="color:#10b981;font-weight:700;">•</span><div>$1</div></div>');
+      html = html.replace(/^\s*(\d+)\.\s+(.*$)/gim, '<div style="display:flex;gap:6px;margin:2px 0 2px 8px;"><span style="color:#059669;font-weight:700;">$1.</span><div>$2</div></div>');
+
+      // Paragraphs
+      html = html.replace(/\n\n/g, '<div style="height:6px;"></div>');
+      html = html.replace(/\n/g, '<br/>');
+
+      return html;
+    }
+
+    function appendUserMessage(text) {
+      if (!chatMsgs) return;
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'agro-msg agro-msg-user';
+      msgDiv.innerHTML = `<div class="agro-bubble-user">${formatMarkdown(text)}</div>`;
+      chatMsgs.appendChild(msgDiv);
+      scrollChatToBottom();
+    }
+
+    function appendBotMessage(text, modelUsed = null) {
+      if (!chatMsgs) return;
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'agro-msg agro-msg-bot';
+      const badge = modelUsed ? `<div class="agro-model-badge">⚡ ${modelUsed} Grounded</div>` : '';
+      msgDiv.innerHTML = `
+        <div class="agro-bubble-bot">
+          ${formatMarkdown(text)}
+          ${badge}
+        </div>
+      `;
+      chatMsgs.appendChild(msgDiv);
+      scrollChatToBottom();
+    }
+
+    function showTypingIndicator() {
+      if (!chatMsgs) return;
+      const ind = document.createElement('div');
+      ind.id = 'agro-typing-indicator';
+      ind.className = 'agro-msg agro-msg-bot';
+      ind.innerHTML = `
+        <div class="agro-typing-bubble">
+          <div class="agro-dot"></div>
+          <div class="agro-dot"></div>
+          <div class="agro-dot"></div>
+        </div>
+      `;
+      chatMsgs.appendChild(ind);
+      scrollChatToBottom();
+    }
+
+    function removeTypingIndicator() {
+      const ind = document.getElementById('agro-typing-indicator');
+      if (ind) ind.remove();
+    }
+
+    function clearChat() {
+      if (!chatMsgs) return;
+      chatMsgs.innerHTML = `
+        <div class="agro-msg agro-msg-bot">
+          <div class="agro-bubble-bot">
+            🌾 <strong>AgroBot AI Session Reset</strong><br/>
+            I am your specialized agronomic assistant. Ask me questions about active leaf disease diagnoses, chemical spray dosages, rain risks, or organic remedies!
+          </div>
+        </div>
+      `;
+      chatHistory = [];
+    }
+
+    // Send logic
+    async function sendMessage(text) {
+      const msg = (text || (chatInput ? chatInput.value : '') || '').trim();
+      if (!msg || isWaiting) return;
+
+      if (chatInput) chatInput.value = '';
+      appendUserMessage(msg);
+
+      // Context gathering
+      let scanCtx = {};
+      if (typeof lastScanResult !== 'undefined' && lastScanResult) {
+        scanCtx = {
+          prediction: lastScanResult.prediction,
+          confidence_pct: lastScanResult.confidence_pct || (lastScanResult.confidence ? Math.round(lastScanResult.confidence * 100) : 0),
+          affected_pct: lastScanResult.gradcam?.affected_pct,
+          weather: lastScanResult.weather || null,
+          timeline_notes: lastScanResult.spread_risk?.explanation || ''
+        };
+      }
+
+      isWaiting = true;
+      if (chatSend) chatSend.disabled = true;
+      showTypingIndicator();
+
+      try {
+        const res = await fetch(`${API}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: msg,
+            context: scanCtx,
+            history: chatHistory.slice(-6)
+          })
+        });
+
+        const data = await res.json();
+        removeTypingIndicator();
+
+        if (res.ok && data.success) {
+          appendBotMessage(data.reply, data.model_used);
+          chatHistory.push({ role: 'user', text: msg });
+          chatHistory.push({ role: 'model', text: data.reply });
+        } else {
+          appendBotMessage(`⚠️ ${data.error || 'Could not retrieve advice from knowledge engine.'}`);
+        }
+      } catch (err) {
+        removeTypingIndicator();
+        appendBotMessage(`⚠️ Connection notice: Backend service at ${API} is not responding. Ensure the Flask server is running.`);
+      } finally {
+        isWaiting = false;
+        if (chatSend) chatSend.disabled = false;
+        if (chatInput) chatInput.focus();
+      }
+    }
+
+    if (chatSend) chatSend.addEventListener('click', () => sendMessage());
+    if (chatInput) {
+      chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+    }
+
+    // Quick Chips click
+    chipBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const prompt = btn.getAttribute('data-prompt');
+        if (prompt) sendMessage(prompt);
+      });
+    });
+
+  })();
+</script>
 </body>
 </html>

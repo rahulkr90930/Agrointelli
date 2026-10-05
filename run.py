@@ -54,15 +54,24 @@ def start_backend():
         print(f"❌ Server error: {e}")
 
 def open_frontend():
-    # Wait for the backend and TensorFlow to initialize (typically ~3.5 seconds)
-    print("⏳ Waiting for backend to initialize before opening frontend...")
-    time.sleep(3.5)
+    print("⏳ Waiting for backend and TensorFlow to initialize...")
+    import urllib.request
+    url = "http://127.0.0.1:5000/health"
+    for _ in range(40):  # Poll for up to 20 seconds
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "AgroIntelli-Launcher"})
+            with urllib.request.urlopen(req, timeout=1) as resp:
+                if resp.status == 200:
+                    break
+        except Exception:
+            pass
+        time.sleep(0.5)
     
     frontend_path = os.path.abspath(os.path.join("frontend", "index.html"))
     if os.path.exists(frontend_path):
-        url = f"file:///{frontend_path.replace(os.sep, '/')}"
-        print(f"🌐 Opening frontend in your web browser: {url}")
-        webbrowser.open(url)
+        browser_url = f"file:///{frontend_path.replace(os.sep, '/')}"
+        print(f"🌐 Backend is live! Opening frontend in your browser: {browser_url}")
+        webbrowser.open(browser_url)
     else:
         print(f"⚠ Warning: Could not find frontend at {frontend_path}")
 
