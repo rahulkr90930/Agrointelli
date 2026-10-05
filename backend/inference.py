@@ -38,7 +38,6 @@ except (ImportError, ValueError):
 MODEL_DIR   = Path(__file__).parent / "models"
 MODEL_PATH  = MODEL_DIR / "agrointelli_phase1_final.keras"
 CLASS_MAP_PATH = MODEL_DIR / "class_index_map.json"
-ADVICE_PATH = MODEL_DIR / "advice.json"
 CSV_KNOWLEDGE_PATH = Path(__file__).parent / "data" / "disease_knowledge.csv"
 
 IMG_SIZE    = 224
@@ -201,11 +200,6 @@ def load_model():
         class_names.clear()
         class_names.extend([k for k, v in sorted(class_to_idx.items(), key=lambda x: x[1])])
         print(f"✅ Classes loaded: {class_names}")
-
-    if ADVICE_PATH.exists():
-        with open(ADVICE_PATH, "r", encoding="utf-8") as f:
-            advice_map = json.load(f)
-        print("✅ Advice map loaded.")
 
     if model is not None:
         grad_model = build_gradcam_model(model)
