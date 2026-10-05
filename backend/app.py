@@ -662,10 +662,11 @@ def delete_record(record_id):
 # ── Startup ───────────────────────────────────────────────────────────────────
 
 def start_server():
-    load_model()
-    print("\n🌿 AgroIntelli backend running at http://localhost:5000")
-    print("   Frontend: open frontend/index.html in a browser")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    print(f"\n🌿 AgroIntelli backend running at http://0.0.0.0:{port}")
+    print("   Frontend: open frontend/index.html in a browser or visit / in browser")
+    app.run(host="0.0.0.0", port=port, debug=False)
 
 
 if __name__ == "__main__":
