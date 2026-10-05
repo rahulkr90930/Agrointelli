@@ -1058,7 +1058,7 @@
               <div class="tp-desc">Enables live weather data to compute epidemic spread risk</div>
             </div>
             <label class="switch">
-              <input type="checkbox" id="use-weather" />
+              <input type="checkbox" id="use-weather" checked />
               <span class="slider"></span>
             </label>
           </div>
@@ -3211,14 +3211,10 @@
     <div style="display:flex;align-items:center;gap:6px;">
       <!-- Language Picker -->
       <select id="agro-chat-lang" class="agro-chat-lang-select" title="Choose Voice & Output Language">
-        <option value="Hindi" data-code="hi-IN" selected>🇮🇳 हिन्दी</option>
-        <option value="English" data-code="en-US">🇬🇧 English</option>
+        <option value="English" data-code="en-US" selected>🇬🇧 English</option>
+        <option value="Hindi" data-code="hi-IN">🇮🇳 हिन्दी (Hindi)</option>
+        <option value="Bengali" data-code="bn-IN">🇮🇳 বাংলা (Bengali)</option>
         <option value="Spanish" data-code="es-ES">🇪🇸 Español</option>
-        <option value="Bengali" data-code="bn-IN">🇮🇳 বাংলা</option>
-        <option value="Marathi" data-code="mr-IN">🇮🇳 मराठी</option>
-        <option value="Punjabi" data-code="pa-IN">🇮🇳 ਪੰਜਾਬੀ</option>
-        <option value="Tamil" data-code="ta-IN">🇮🇳 தமிழ்</option>
-        <option value="Telugu" data-code="te-IN">🇮🇳 తెలుగు</option>
       </select>
       <button id="agro-chat-tts-toggle" class="agro-chat-btn-icon" title="Toggle Auto Voice Readout">🔊</button>
       <button id="agro-chat-clear" class="agro-chat-btn-icon" title="Reset Session">🗑️</button>
@@ -3478,7 +3474,7 @@
       stopSpeech();
 
       const selOption = langSelect ? langSelect.options[langSelect.selectedIndex] : null;
-      const langCode = selOption ? (selOption.getAttribute('data-code') || 'hi-IN') : 'hi-IN';
+      const langCode = selOption ? (selOption.getAttribute('data-code') || 'en-US') : 'en-US';
       const meta = LANG_META[langCode] || { iso: langCode.split('-')[0], keywords: [] };
       const text = cleanForSpeech(rawText);
       if (!text) return;
@@ -3505,23 +3501,24 @@
         }
       }
 
-      // If target language is non-English, but the only local voice is English,
-      // Windows default TTS cannot pronounce Hindi/Devanagari.
-      // Automatically fallback to authentic native cloud TTS stream!
       const isNonEnglish = meta.iso !== 'en';
       const voiceIsEnglish = matchedVoice && (matchedVoice.lang || '').toLowerCase().startsWith('en');
 
-      if (matchedVoice && !(isNonEnglish && voiceIsEnglish)) {
+      if ('speechSynthesis' in window) {
         const utter = new SpeechSynthesisUtterance(text);
-        utter.voice = matchedVoice;
-        utter.lang = matchedVoice.lang || langCode;
+        utter.lang = langCode;
+        if (matchedVoice && !(isNonEnglish && voiceIsEnglish)) {
+          utter.voice = matchedVoice;
+        }
         utter.rate = 0.95;
         utter.pitch = 1.0;
         utter.onend = () => stopSpeech();
-        utter.onerror = () => stopSpeech();
+        utter.onerror = () => {
+          console.warn('Speech synthesis notice, trying audio stream fallback...');
+          playCloudAudioStream(text, meta.iso, () => stopSpeech());
+        };
         window.speechSynthesis.speak(utter);
       } else {
-        // Guaranteed native pronunciation in Hindi, Spanish, Bengali, Marathi, etc.
         playCloudAudioStream(text, meta.iso, () => stopSpeech());
       }
     }
@@ -3676,7 +3673,7 @@
 
     // Dynamic Quick Chips for Past Data & Language
     function updateChipsForLanguage(plant = null, diag = null) {
-      const currentLang = langSelect ? langSelect.value : 'Hindi';
+      const currentLang = langSelect ? langSelect.value : 'English';
       const chipContainer = document.querySelector('.agro-chat-chips');
       if (!chipContainer) return;
 
@@ -3688,6 +3685,13 @@
             <button class="agro-chip-btn" data-prompt="मेरी पिछली बीमारी (${diag}) के लिए कौन सा स्प्रे करें?">💧 दवा और स्प्रे डोज</button>
             <button class="agro-chip-btn" data-prompt="क्या मेरी फसल में बीमारी फैलने का खतरा है?">🌧️ मौसम और फैलाव जोखिम</button>
             <button class="agro-chip-btn" data-prompt="मेरे सभी पिछले मोंगोडीबी (MongoDB) रिकॉर्ड संक्षेप में बताएं।">📜 सभी पिछले रिकॉर्ड</button>
+          `;
+        } else if (currentLang === 'Bengali') {
+          chipContainer.innerHTML = `
+            <button class="agro-chip-btn" data-prompt="আমার আগের স্ক্যানের (${plant} - ${diag}) ফলাফল কী ছিল?">📊 আগের স্ক্যানের ফলাফল</button>
+            <button class="agro-chip-btn" data-prompt="আমার আগের রোগের (${diag}) জন্য কোন ওষুধ স্প্রে করব?">💧 ওষুধ এবং স্প্রে মাত্রা</button>
+            <button class="agro-chip-btn" data-prompt="আমার ফসলে কি রোগ ছড়ানোর কোনো ঝুঁকি আছে?">🌧️ আবহাওয়া এবং ঝুঁকি</button>
+            <button class="agro-chip-btn" data-prompt="আমার আগের সমস্ত মঙ্গোডিবি (MongoDB) রেকর্ড সংক্ষেপে দেখান।">📜 সমস্ত অতীত রেকর্ড</button>
           `;
         } else if (currentLang === 'Spanish') {
           chipContainer.innerHTML = `
@@ -3712,6 +3716,13 @@
             <button class="agro-chip-btn" data-prompt="बारिश और नमी से रोग फैलने का कितना खतरा है?">🌧️ बारिश और मौसम का जोखिम</button>
             <button class="agro-chip-btn" data-prompt="नीम के तेल का जैविक उपचार और सही मात्रा बताएं।">🌿 नीम तेल जैविक उपाय</button>
             <button class="agro-chip-btn" data-prompt="मेरे पिछले स्कैन के सभी रिकॉर्ड मोंगोडीबी (MongoDB) से दिखाएं।">📜 पिछले स्कैन रिकॉर्ड</button>
+          `;
+        } else if (currentLang === 'Bengali') {
+          chipContainer.innerHTML = `
+            <button class="agro-chip-btn" data-prompt="এই রোগের জন্য আজকে কোন কীটনাশক স্প্রে করব?">💧 কোন ওষুধ স্প্রে করবেন?</button>
+            <button class="agro-chip-btn" data-prompt="বৃষ্টি এবং আর্দ্রতায় রোগ ছড়ানোর কতটা ঝুঁকি রয়েছে?">🌧️ বৃষ্টি ও আবহাওয়ার ঝুঁকি</button>
+            <button class="agro-chip-btn" data-prompt="নিম তেলের জৈব প্রতিকার এবং সঠিক মাত্রা জানান।">🌿 নিম তেল জৈব প্রতিকার</button>
+            <button class="agro-chip-btn" data-prompt="আমার আগের সমস্ত স্ক্যান রেকর্ড মঙ্গোডিবি থেকে দেখান।">📜 অতীত স্ক্যান রেকর্ড</button>
           `;
         } else if (currentLang === 'Spanish') {
           chipContainer.innerHTML = `
@@ -3775,7 +3786,7 @@
       langSelect.addEventListener('change', () => {
         stopSpeech();
         const selOption = langSelect.options[langSelect.selectedIndex];
-        const langCode = selOption ? (selOption.getAttribute('data-code') || 'hi-IN') : 'hi-IN';
+        const langCode = selOption ? (selOption.getAttribute('data-code') || 'en-US') : 'en-US';
         if (recognition) recognition.lang = langCode;
         checkMongoDBRecordsForChat();
       });
@@ -3800,7 +3811,7 @@
         };
       }
 
-      const currentLang = langSelect ? langSelect.value : 'Hindi';
+      const currentLang = langSelect ? langSelect.value : 'English';
       const uid = (typeof getCurrentUserId === 'function') ? getCurrentUserId() : 'guest';
 
       isWaiting = true;

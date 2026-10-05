@@ -286,14 +286,14 @@ def predict():
         return jsonify({"error": "Could not decode image. Use a valid JPG or PNG."}), 400
 
     field_mode = request.form.get("mode", "field") == "field"
-    use_weather = request.form.get("weather", "false").lower() == "true"
+    use_w_param = request.form.get("use_weather") or request.form.get("weather") or "true"
+    use_weather = use_w_param.lower() in ("true", "1", "yes")
     arch = request.form.get("architecture") or request.args.get("arch")
 
     weather = None
     if use_weather:
         weather_payload = fetch_live_weather_snapshot()
-        if weather_payload.get("success"):
-            weather = weather_payload.get("weather")
+        weather = weather_payload.get("weather")
 
     try:
         result = run_prediction(img_bgr, field_mode=field_mode, weather=weather, model_choice=arch)

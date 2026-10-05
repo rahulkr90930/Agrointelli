@@ -98,6 +98,7 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
     if not user_message or not user_message.strip():
         welcome_msgs = {
             "Hindi": "नमस्ते! मैं एग्रोबॉट (AgroBot) हूँ, आपका कृषि सहायक। पत्ती स्कैन करें, पिछले रिकॉर्ड देखें या फसल, सिंचाई और रोग उपचार के बारे में कुछ भी पूछें।",
+            "Bengali": "নমস্কার! আমি এগ্রোবট (AgroBot), আপনার কৃষি সহকারী। পাতার ফটো স্ক্যান করুন, আগের ফিল্ড রেকর্ড দেখুন অথবা ফসল সেচ এবং রোগ নিরাময় সম্পর্কে প্রশ্ন করুন।",
             "Spanish": "¡Hola! Soy AgroBot, su asistente agrícola y de salud vegetal. Escanee una hoja, revise sus registros de MongoDB o pregúnteme sobre cultivos y tratamientos.",
         }
         return {
@@ -200,11 +201,23 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
 
 
 def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, language="English", is_historical=False, plant_name="", mongo_summary=""):
-    """Generates an immediate, natural agronomic response using local knowledge and MongoDB history."""
+    """Generates an immediate, natural agronomic response using local knowledge and MongoDB history in requested language."""
     q_lower = query.lower().strip()
 
     # 1. Greetings & Identity
-    if any(q_lower.startswith(g) or q_lower == g for g in ["hi", "hello", "hey", "namaste", "hola", "who are you", "what is your name", "who r u"]):
+    if any(q_lower.startswith(g) or q_lower == g for g in ["hi", "hello", "hey", "namaste", "hola", "namoshkar", "who are you", "what is your name"]):
+        if language == "Hindi":
+            return (
+                "नमस्ते! मैं **एग्रोबॉट (AgroBot)** हूँ, आपका डिजिटल कृषि सहायक और फसल रोग विशेषज्ञ।\n\n"
+                "आप पत्ती की फोटो अपलोड करके बीमारी का पता लगा सकते हैं, अपने पिछले रिकॉर्ड देख सकते हैं, "
+                "या सिंचाई, खाद और फसल सुरक्षा से जुड़ा कोई भी सवाल पूछ सकते हैं।"
+            )
+        elif language == "Bengali":
+            return (
+                "নমস্কার! আমি **এগ্রোবট (AgroBot)**, আপনার ডিজিটাল কৃষি সহকারী এবং ফসল বিশেষজ্ঞ।\n\n"
+                "আপনি পাতার ছবি আপলোড করে রোগ নির্ণয় করতে পারেন, আপনার অতীতের রেকর্ড পরীক্ষা করতে পারেন "
+                "অথবা সেচ, সার এবং কীটনাশক সংক্রান্ত যেকোনো প্রশ্ন জিজ্ঞাসা করতে পারেন।"
+            )
         return (
             "Hello! I am **AgroIntelli AI (AgroBot)**, your intelligent agricultural and crop health assistant.\n\n"
             "You can upload a leaf photo to diagnose diseases, check your past field records from MongoDB, "
@@ -212,104 +225,129 @@ def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, langua
         )
 
     # 2. Watering & Irrigation
-    if any(k in q_lower for k in ["water", "watering", "irrigation", "sinchai", "paani", "how often to water"]):
+    if any(k in q_lower for k in ["water", "watering", "irrigation", "sinchai", "paani", "jol", "how often to water"]):
+        if language == "Hindi":
+            return (
+                "### 💧 सिंचाई और नमी प्रबंधन सलाह\n\n"
+                "1. **तरीका**: हमेशा **ड्रिप सिंचाई (Drip Irrigation)** का उपयोग करें। पत्तियों के ऊपर पानी छिड़कने से फफूंद जनित रोग तेजी से फैलते हैं।\n"
+                "2. **समय**: सुबह जल्दी (6:00 AM - 9:00 AM) पानी दें ताकि पत्तियों पर पड़ा पानी सुबह की धूप में सूख जाए।\n"
+                "3. **नमी जांच**: मिट्टी में 2 इंच गहराई पर नमी जांचें। यदि मिट्टी गीली महसूस हो तो सिंचाई रोक दें।"
+            )
+        elif language == "Bengali":
+            return (
+                "### 💧 সেচ এবং আর্দ্রতা ব্যবস্থাপনা পরামর্শ\n\n"
+                "১. **পদ্ধতি**: সর্বদা **ড্রিপ সেচ (Drip Irrigation)** ব্যবহার করুন। পাতার ওপর জল ছেটালে ছত্রাকজনিত রোগ দ্রুত ছড়ায়।\n"
+                "২. **সময়**: সকালের দিকে (৬:০০ AM - ৯:০০ AM) সেচ দিন যাতে পাতার ওপর জমাপড়া জল দ্রুত শুকিয়ে যায়।\n"
+                "৩. **আর্দ্রতা পরীক্ষা**: মাটিতে ২ ইঞ্চি গভীরে আর্দ্রতা পরীক্ষা করুন। মাটি ভেজা থাকলে সেচ স্থগিত রাখুন।"
+            )
         return (
             "### 💧 Practical Irrigation & Moisture Management\n\n"
             "Here are recommended watering guidelines for optimal crop vigor and disease prevention:\n\n"
-            "1. **Method**: Always use **drip irrigation or ground-level soakers** at the root zone rather than overhead sprinklers. Wet foliage is the #1 trigger for fungal spore germination and bacterial leaf spots.\n"
-            "2. **Timing**: Irrigate **early in the morning (6:00 AM – 9:00 AM)**. Any incidental moisture on the leaves evaporates quickly with morning warmth, minimizing leaf-wetness duration.\n"
-            "3. **Frequency**: Deep, less frequent watering (2–3 times per week, 1–1.5 inches total) promotes deeper root systems compared to shallow daily wetting.\n"
-            "4. **Moisture Check**: Insert a finger or moisture meter 2 inches into the soil. If it feels cool and damp, delay watering to prevent root hypoxia and root rots (*Pythium/Phytophthora*)."
+            "1. **Method**: Always use **drip irrigation or ground-level soakers** at the root zone rather than overhead sprinklers.\n"
+            "2. **Timing**: Irrigate **early in the morning (6:00 AM – 9:00 AM)** so leaf wetness evaporates quickly.\n"
+            "3. **Frequency**: Deep, less frequent watering (2–3 times per week) promotes deeper root growth.\n"
+            "4. **Moisture Check**: Check soil 2 inches deep before watering to avoid root rot."
         )
 
     # 3. Soil & Fertilization
-    if any(k in q_lower for k in ["soil", "fertilizer", "fertiliser", "khad", "npk", "compost", "manure"]):
+    if any(k in q_lower for k in ["soil", "fertilizer", "fertiliser", "khad", "npk", "compost", "manure", "mati"]):
+        if language == "Hindi":
+            return (
+                "### 🌱 मिट्टी का स्वास्थ्य और संतुलित पोषण\n\n"
+                "1. **जैविक खाद**: मिट्टी में अच्छी तरह से सड़ी वर्मीकंपोस्ट या गोबर की खाद मिलाएं।\n"
+                "2. **संतुलित NPK**: अत्यधिक नाइट्रोजन (N) के उपयोग से बचें, इससे पौधे कमजोर होते हैं और कीट-रोगों का हमला बढ़ता है।\n"
+                "3. **मल्चिंग**: पौधों की जड़ों के पास सूखी घास या मल्च लगाएं ताकि मिट्टी की नमी बरकरार रहे।"
+            )
+        elif language == "Bengali":
+            return (
+                "### 🌱 মাটির স্বাস্থ্য এবং সুষম পুষ্টি\n\n"
+                "১. **জৈব সার**: মাটিতে ভার্মিকম্পোস্ট বা পচা গোবর সার ভালো করে মিশিয়ে দিন।\n"
+                "২. **সুষম NPK**: অতিরিক্ত নাইট্রোজেন ব্যবহার এড়িয়ে চলুন, এতে রোগ ও পোকার আক্রমণ বাড়ে।\n"
+                "৩. **মালচিং**: গাছের গোড়ায় খড় বা কুপন ব্যবহার করে মালচিং করুন যাতে মাটির আর্দ্রতা বজায় থাকে।"
+            )
         return (
             "### 🌱 Soil Health & Balanced Crop Nutrition\n\n"
-            "Healthy soil is the first line of defense against crop stress and disease:\n\n"
-            "1. **Organic Matter**: Incorporate well-aged compost or vermicompost (2–3 inches worked into the topsoil) to improve soil aeration, drainage, and beneficial microbial activity.\n"
-            "2. **Balanced N-P-K**: Avoid excessive nitrogen (N) fertilization, which produces lush, succulent vegetative growth that is highly vulnerable to fungal blight and aphid infestations.\n"
-            "3. **Soil pH**: Most vegetable crops (tomatoes, potatoes, corn) thrive in slightly acidic to neutral soil (pH 6.0–6.8). Test pH annually.\n"
-            "4. **Mulching**: Apply 2 inches of organic straw or wood chips around the crop base to retain soil moisture, suppress weeds, and prevent soil-borne pathogens from splashing onto lower leaves."
+            "1. **Organic Matter**: Incorporate well-aged compost or vermicompost to improve soil aeration and microbial activity.\n"
+            "2. **Balanced N-P-K**: Avoid excessive nitrogen, which produces soft growth vulnerable to fungal blights.\n"
+            "3. **Mulching**: Apply 2 inches of organic straw around the crop base to retain moisture and suppress weeds."
         )
 
     has_active_disease = bool(pred and pred != "None active" and pred != "Unknown / Not Scanned")
     crop = plant_name or knowledge.get("crop", "your crop")
     disease = knowledge.get("common_name", pred.replace("_", " ").title()) if has_active_disease else "Crop Health Consultation"
     pathogen = knowledge.get("pathogen", "fungal/bacterial pathogen")
-    chem = knowledge.get("treatment_protocol", "Apply a broad-spectrum protective fungicide (e.g., Mancozeb 2.5 g/L or Chlorothalonil 2 ml/L).")
-    organic = knowledge.get("organic_remedies", "Cold-pressed neem oil spray (5 ml/L with mild surfactant) or dilute copper hydroxide.")
-    prevention = knowledge.get("prevention", "Ensure good plant spacing, sanitize pruning tools, and water at the root base.")
+    chem = knowledge.get("treatment_protocol", "Apply Mancozeb 2.5 g/L or Chlorothalonil 2 ml/L.")
+    organic = knowledge.get("organic_remedies", "Neem oil spray (5 ml/L with mild soap).")
+    prevention = knowledge.get("prevention", "Ensure good plant spacing and sanitize pruning tools.")
 
     temp = weather.get("temp_c", 25) if weather else 25
     hum = weather.get("humidity_pct", 65) if weather else 65
     rain = weather.get("rain_1h_mm", 0) if weather else 0
 
-    aff_str = f"covering approximately **{aff_pct:.1f}%** of the leaf surface" if (aff_pct is not None and has_active_disease) else ""
-    source_prefix = "### 🍃 Historical Field Record (From MongoDB)\n\n" if is_historical else ""
-
     # 4. Sprays & Chemical Fungicides
-    if any(k in q_lower for k in ["spray", "chemical", "medicine", "treatment", "cure", "fungicide", "dawa"]):
+    if any(k in q_lower for k in ["spray", "chemical", "medicine", "treatment", "cure", "fungicide", "dawa", "aushadh"]):
+        if language == "Hindi":
+            return (
+                f"### 🛡️ **{disease}** के लिए संस्तुत छिड़काव (Treatment Protocol)\n\n"
+                f"1. **रासायनिक उपचार**: {chem}\n"
+                f"2. **मौसम सावधानी**: वर्तमान तापमान **{temp}°C, नमी {hum}%** है। यदि बारिश की संभावना हो तो स्टिकर मिलाएं।\n"
+                f"3. **समय**: सुबह 9 बजे से पहले या शाम को छिड़काव करें।"
+            )
+        elif language == "Bengali":
+            return (
+                f"### 🛡️ **{disease}** এর জন্য স্প্রে নির্দেশিকা\n\n"
+                f"১. **রাসায়নিক প্রতিকার**: {chem}\n"
+                f"২. **আবহাওয়া সর্তকতা**: বর্তমান তাপমাত্রা **{temp}°C, আর্দ্রতা {hum}%**। বৃষ্টিপাতের সম্ভাবনা থাকলে স্টিকার মেশান।\n"
+                f"৩. **সময়**: সকাল ৯টার আগে বা বৈকালে স্প্রে করুন।"
+            )
         return (
-            f"{source_prefix}### 🛡️ Recommended Spray Protocol for **{disease}**\n\n"
-            f"1. **Chemical Treatment**:\n   - {chem}\n"
-            f"   - *Application Timing*: Spray in the early morning (before 9 AM) or late afternoon. Coat both upper and lower leaf surfaces.\n\n"
-            f"2. **Weather Safeguards**:\n   - Current conditions: **{temp}°C, {hum}% humidity, {rain} mm/h rain**.\n"
-            f"   - If rain is expected within 4–6 hours, delay spraying or add a sticker/adjuvant so the solution is not washed off.\n\n"
-            f"3. **Follow-up**:\n   - Re-check after 5–7 days to ensure lesion expansion has halted."
+            f"### 🛡️ Recommended Spray Protocol for **{disease}**\n\n"
+            f"1. **Chemical Treatment**: {chem}\n"
+            f"2. **Weather Conditions**: **{temp}°C, {hum}% humidity, {rain} mm/h rain**.\n"
+            f"3. **Application**: Spray early morning or late afternoon."
         )
 
     # 5. Organic Remedies
     if any(k in q_lower for k in ["organic", "natural", "home", "bio", "neem", "jaivik"]):
+        if language == "Hindi":
+            return (
+                f"### 🌿 **{disease}** का जैविक उपचार\n\n"
+                f"1. **नीम तेल गोल**: 5 मिली शुद्ध नीम तेल + 1 मिली तरल साबुन को 1 लीटर गुनगुने पानी में घोलकर 5-7 दिनों पर स्प्रे करें।\n"
+                f"2. **जैविक विकल्प**: {organic}\n"
+                f"3. **रोकथाम**: {prevention}"
+            )
+        elif language == "Bengali":
+            return (
+                f"### 🌿 **{disease}** এর জৈব সমাধান\n\n"
+                f"১. **নিম তেলের মিশ্রণ**: ৫ মিলি নিম তেল + ১ মিলি তরল সাবান ১ লিটার উষ্ণ জলে মিশিয়ে স্প্রে করুন।\n"
+                f"২. **জৈব বিকল্প**: {organic}\n"
+                f"৩. **প্রতিরোধ**: {prevention}"
+            )
         return (
-            f"{source_prefix}### 🌿 Organic & Biological Solutions for **{disease}**\n\n"
-            f"1. **Organic Formulation**:\n   - {organic}\n"
-            f"   - *Neem Oil Recipe*: Mix 5 ml pure cold-pressed neem oil + 1 ml mild liquid soap into 1 liter of warm water. Spray every 5–7 days.\n\n"
-            f"2. **Cultural Controls**:\n   - Prune and safely destroy lower infected leaves.\n   - Ensure adequate spacing between plants to maximize airflow.\n\n"
-            f"3. **Prevention**:\n   - {prevention}"
+            f"### 🌿 Organic & Biological Solutions for **{disease}**\n\n"
+            f"1. **Neem Oil Recipe**: Mix 5 ml cold-pressed neem oil + 1 ml liquid soap per liter of water.\n"
+            f"2. **Biological Remedy**: {organic}\n"
+            f"3. **Prevention**: {prevention}"
         )
 
-    # 6. MongoDB History / Past Records
-    if any(k in q_lower for k in ["past", "history", "mongo", "previous", "record", "purani", "pichla"]):
-        history_info = f"\n\n**Your Saved Field Records**:\n{mongo_summary}" if mongo_summary else ""
+    # General Agronomic Response
+    if language == "Hindi":
         return (
-            f"### 📜 AgroIntelli Field Journal (MongoDB Records)\n\n"
-            f"Here is your historical crop health journal:\n"
-            f"- **Latest Saved Crop**: **{crop}**\n"
-            f"- **Diagnosis**: **{disease}**\n"
-            f"{f'- **Lesion Area**: {aff_pct:.1f}%' if (aff_pct is not None and has_active_disease) else ''}"
-            f"{history_info}\n\n"
-            f"**Next Step**: Upload a new leaf photo to compare disease progression over time."
+            f"धन्यवाद! मैं आपका फसल रोग और कृषि सलाहकार हूँ। "
+            f"आप बीमारी के इलाज (*'आलू अगेती झुलसा का इलाज क्या है?'*), सिंचाई, या जैविक स्प्रे के बारे में सवाल पूछ सकते हैं "
+            f"या पत्ती की फोटो अपलोड करके विस्तृत जांच पा सकते हैं।"
+        )
+    elif language == "Bengali":
+        return (
+            f"ধন্যবাদ! আমি আপনার শস্য স্বাস্থ্য ও কৃষি পরামর্শদাতা। "
+            f"আপনি রোগ নিরাময় (*'আলুর আর্লি ব্লাইট রোগের প্রতিকার কী?'*), সেচ, বা জৈব স্প্রে সম্পর্কে প্রশ্ন জিজ্ঞাসা করতে পারেন "
+            f"অথবা পাতার ছবি আপলোড করে বিস্তারিত রিপোর্ট পেতে পারেন।"
         )
 
-    # 7. Weather / Climate Risk
-    if any(k in q_lower for k in ["rain", "weather", "humidity", "temperature", "climate", "mausam"]):
-        risk = "HIGH" if (hum >= 75 or rain > 0) else "MODERATE"
-        return (
-            f"{source_prefix}### 🌦️ Microclimate Disease Risk Telemetry\n\n"
-            f"Field conditions: **{temp}°C | {hum}% Humidity | {rain} mm/h Rain**.\n\n"
-            f"- **Spore Germination Risk**: **{risk}**\n"
-            f"- **Analysis**: {'Prolonged humidity and rain create optimal conditions for fungal sporulation and bacterial splash dispersal.' if risk == 'HIGH' else 'Moderate conditions slow pathogen spread. Maintain baseline preventative care.'}\n"
-            f"- **Action**: Keep leaf canopies well-ventilated and avoid working in the field while plants are wet."
-        )
-
-    # 8. Active Disease Overview (if a scan was performed)
-    if has_active_disease:
-        return (
-            f"{source_prefix}### 🌾 Diagnostic Summary: **{disease}** ({pathogen})\n\n"
-            f"{f'- **Lesion Severity**: {aff_pct:.1f}% affected leaf tissue.' if aff_pct is not None else ''}\n"
-            f"- **Field Conditions**: {temp}°C, {hum}% humidity.\n\n"
-            f"**Recommended Steps**:\n"
-            f"1. **Curative Spray**: {chem}\n"
-            f"2. **Organic Alternative**: {organic}\n"
-            f"3. **Prevention**: {prevention}\n\n"
-            f"Ask me for specific application dosages, rainfall timing, or organic preparation recipes!"
-        )
-
-    # 9. General Agronomic Response
     return (
-        f"Thank you for reaching out. As your agricultural pathologist, I am here to assist with all aspects of crop health, "
+        f"Thank you for reaching out. As your agricultural pathologist, I am here to assist with crop health, "
         f"plant nutrition, irrigation, and pest or disease control.\n\n"
-        f"Feel free to ask a specific question (e.g., *'How to manage early blight in potatoes?'*, *'How often should I water corn?'*), "
+        f"Feel free to ask a specific question (e.g., *'How to manage early blight in potatoes?'*), "
         f"or upload a leaf scan to receive an instant diagnostic breakdown and Grad-CAM lesion analysis."
     )
+
