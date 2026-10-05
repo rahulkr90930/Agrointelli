@@ -45,7 +45,12 @@ Built as a final-year engineering capstone project, AgroIntelli empowers farmers
 ```text
 AgroIntelli/
 ├── backend/
-│   ├── app.py                     # Flask REST API (Inference, MongoDB, Weather, Grad-CAM)
+│   ├── app.py                     # Flask REST Controller (routes, CORS, request dispatch)
+│   ├── inference.py               # Dual AI Model Engine (MobileNetV3 & EfficientNet-B0 inference)
+│   ├── gradcam.py                 # Grad-CAM XAI & Adaptive Otsu Lesion Quantification
+│   ├── weather.py                 # Live Weather API integration & Microclimate Progression
+│   ├── batch.py                   # Multi-image Chronological Trajectory & Velocity Analysis
+│   ├── database.py                # MongoDB Atlas Cloud Persistence & User Authentication
 │   └── models/                    # Model weights & label mappings (.gitkeep)
 ├── frontend/
 │   └── index.html                 # Single-page web application with responsive UI/UX
