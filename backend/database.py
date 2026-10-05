@@ -195,15 +195,32 @@ class StorageManager:
             items.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
             return items
 
-    def delete_record(self, record_id, user_id):
+    def delete_record(self, record_id, user_id=None):
+        if not record_id:
+            return False
         if self.is_mongo:
-            self.db.leaf_records.delete_one({"record_id": record_id, "user_id": user_id})
+            # 1. Match directly by unique record_id
+            res = self.db.leaf_records.delete_one({"record_id": record_id})
+            if res.deleted_count > 0:
+                return True
+            # 2. Match by MongoDB ObjectId if passed
+            try:
+                from bson import ObjectId
+                if ObjectId.is_valid(record_id):
+                    res = self.db.leaf_records.delete_one({"_id": ObjectId(record_id)})
+                    if res.deleted_count > 0:
+                        return True
+            except Exception:
+                pass
+            return False
         else:
             data = self._load_fallback()
-            if record_id in data.get("records", {}):
-                if data["records"][record_id].get("user_id") == user_id or user_id == "guest":
-                    del data["records"][record_id]
-                    self._save_fallback(data)
+            records = data.get("records", {})
+            if record_id in records:
+                del records[record_id]
+                self._save_fallback(data)
+                return True
+            return False
 
 
 db_store = StorageManager()

@@ -652,11 +652,13 @@ def recheck_leaf(record_id):
     })
 
 
-@app.route("/api/records/<record_id>", methods=["DELETE"])
+@app.route("/api/records/<record_id>", methods=["DELETE", "OPTIONS"])
 def delete_record(record_id):
-    user_id = request.args.get("user_id", "guest").strip()
-    db_store.delete_record(record_id, user_id)
-    return jsonify({"success": True, "message": "Record removed."})
+    if request.method == "OPTIONS":
+        return jsonify({"success": True}), 200
+    user_id = request.args.get("user_id", "").strip()
+    deleted = db_store.delete_record(record_id, user_id)
+    return jsonify({"success": True, "deleted": deleted, "message": "Record removed."})
 
 
 # ── Startup ───────────────────────────────────────────────────────────────────

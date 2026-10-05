@@ -2418,10 +2418,15 @@
     if (!confirm('Are you sure you want to remove this tracked leaf record?')) return;
     const uid = getCurrentUserId();
     try {
-      await fetch(`${API}/api/records/${encodeURIComponent(recordId)}?user_id=${encodeURIComponent(uid)}`, { method: 'DELETE' });
+      const res = await fetch(`${API}/api/records/${encodeURIComponent(recordId)}?user_id=${encodeURIComponent(uid)}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
       await loadJournalList();
-      refreshRecordCount();
-    } catch {}
+      await refreshRecordCount();
+    } catch (err) {
+      console.error('Delete leaf record error:', err);
+    }
   }
 
   /* ── Save Current Scan to Journal ─────────────────────────── */
