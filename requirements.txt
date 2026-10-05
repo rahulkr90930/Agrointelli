@@ -13,5 +13,8 @@ matplotlib>=3.7,<4
 pillow>=10,<12
 opencv-python-headless>=4.8,<5
 
+# AI & LLM Chatbot Integration
+google-generativeai>=0.8.0
+
 # Optional, useful in Jupyter notebooks
 ipykernel>=6.29,<7

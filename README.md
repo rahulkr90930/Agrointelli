@@ -38,10 +38,16 @@ Built as a final-year engineering capstone project, AgroIntelli empowers farmers
    - Records every inspection with `day_number`, date, timestamp, weather telemetry, Grad-CAM overlays, and compressed thumbnail images.
    - Full timeline history expandable per plant sample.
 
-7. **Externalized Knowledge Base & Future Chatbot/LLM Ready**:
+7. **Externalized Knowledge Base & Decoupled Rules**:
    - Disease risk rules, pathogen taxonomy, microclimate tolerances, chemical treatments, and organic remedies are decoupled into `backend/data/disease_knowledge.csv`.
    - Modifiable directly in Excel or Google Sheets without touching Python code.
-   - Exposes REST endpoints (`GET /api/knowledge` and `GET /api/knowledge/<disease_id>`) for direct ingestion into RAG pipelines, LangChain, or LLM-based conversational chatbots.
+   - Exposes REST endpoints (`GET /api/knowledge` and `GET /api/knowledge/<disease_id>`).
+
+8. **AgroBot AI — Grounded Agricultural Chatbot**:
+   - Integrated floating AI assistant powered by Google Gemini (`gemini-flash-latest`) and grounded in the active leaf diagnostic telemetry.
+   - Automatically ingests current leaf disease prediction, Grad-CAM lesion area %, live microclimate weather (temperature, humidity, rain), and the structured pathology knowledge base.
+   - Provides strictly agronomic guidance: chemical fungicide concentrations (g/L), spray timing, rain wash-off safeguards, organic neem oil recipes, and cultural sanitation.
+   - Includes quick-prompt chips, session reset, and localized fallback expert mode.
 
 ---
 
@@ -51,6 +57,7 @@ Built as a final-year engineering capstone project, AgroIntelli empowers farmers
 AgroIntelli/
 ├── backend/
 │   ├── app.py                     # Flask REST Controller (routes, CORS, request dispatch)
+│   ├── chatbot.py                 # Gemini LLM Chatbot Engine grounded in telemetry & CSV knowledge
 │   ├── inference.py               # Dual AI Model Engine (MobileNetV3 & EfficientNet-B0 inference)
 │   ├── gradcam.py                 # Grad-CAM XAI & Adaptive Otsu Lesion Quantification
 │   ├── weather.py                 # Live Weather API integration & Microclimate Progression

@@ -136,6 +136,45 @@ def get_disease_knowledge(disease_id):
     return jsonify({"success": True, "record": rec})
 
 
+@app.route("/api/chat", methods=["POST"])
+def chat():
+    """
+    POST /api/chat
+    Agronomic chatbot query grounded in live leaf diagnosis, Grad-CAM, weather, and knowledge base.
+    """
+    data = request.get_json(silent=True) or {}
+    message = data.get("message", "").strip()
+    if not message:
+        return jsonify({"error": "Message is required"}), 400
+
+    context = data.get("context", {}) or {}
+    history = data.get("history", [])
+
+    # Automatically enrich with scientific knowledge base from CSV
+    pred = context.get("prediction")
+    if pred and "knowledge_record" not in context:
+        try:
+            from .inference import get_knowledge_record
+        except (ImportError, ValueError):
+            from inference import get_knowledge_record
+        rec = get_knowledge_record(pred)
+        if rec:
+            context["knowledge_record"] = rec
+
+    try:
+        from .chatbot import generate_chat_response
+    except (ImportError, ValueError):
+        from chatbot import generate_chat_response
+
+    result = generate_chat_response(message, scan_context=context, history=history)
+    return jsonify({
+        "success": True,
+        "reply": result["reply"],
+        "grounded": result["grounded"],
+        "model_used": result["model_used"]
+    })
+
+
 # ── Diagnostics & Predictions ────────────────────────────────────────────────
 
 @app.route("/predict", methods=["POST"])
