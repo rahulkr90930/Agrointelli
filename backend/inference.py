@@ -201,16 +201,21 @@ def load_model():
         print("⚠  TensorFlow unavailable — running in demo mode.")
         return
 
-    # 1. Primary Model (MobileNetV3 / Default baseline)
-    if MODEL_PATH.exists():
+    # 1. Architecture 1: MobileNetV3 (Primary Edge Architecture)
+    mob_path = MODEL_DIR / "model_mobilenet.keras"
+    if not mob_path.exists() and MODEL_PATH.exists():
+        mob_path = MODEL_PATH
+
+    if mob_path.exists():
         try:
-            print(f"🔄 Loading AgroIntelli primary model from {MODEL_PATH.name}...")
-            model = keras.models.load_model(str(MODEL_PATH), compile=False)
-            available_models["primary"] = model
-            available_models["mobilenet"] = model
-            print(f"✅ Primary model loaded: {MODEL_PATH.name}")
+            print(f"🔄 Loading MobileNetV3 architecture from {mob_path.name}...")
+            mob_model = keras.models.load_model(str(mob_path), compile=False)
+            model = mob_model
+            available_models["primary"] = mob_model
+            available_models["mobilenet"] = mob_model
+            print(f"✅ MobileNetV3 loaded: {mob_path.name}")
         except Exception as e:
-            print(f"⚠  Failed to load {MODEL_PATH.name}: {e}")
+            print(f"⚠  Failed to load {mob_path.name}: {e}")
 
     # Fallback to previous backup model if primary fails or is missing
     if model is None and BACKUP_MODEL_PATH.exists():
@@ -223,23 +228,15 @@ def load_model():
         except Exception as e:
             print(f"⚠  Failed to load backup {BACKUP_MODEL_PATH.name}: {e}")
 
-    # 2. Check for Architecture 2: EfficientNet-B0
+    # 2. Architecture 2: EfficientNet-B0 (Trained via notebook 03)
     eff_model_path = MODEL_DIR / "model_efficientnet_b0.keras"
     if eff_model_path.exists():
         try:
+            print(f"🔄 Loading EfficientNet-B0 architecture from {eff_model_path.name}...")
             available_models["efficientnet"] = keras.models.load_model(str(eff_model_path), compile=False)
-            print(f"✅ Architecture 2 loaded: {eff_model_path.name}")
+            print(f"✅ EfficientNet-B0 loaded: {eff_model_path.name}")
         except Exception as e:
             print(f"⚠  Failed to load EfficientNet-B0: {e}")
-
-    # 3. Check for specific Architecture 1 MobileNet file
-    mob_model_path = MODEL_DIR / "model_mobilenet.keras"
-    if mob_model_path.exists() and "mobilenet" not in available_models:
-        try:
-            available_models["mobilenet"] = keras.models.load_model(str(mob_model_path), compile=False)
-            print(f"✅ Architecture 1 loaded: {mob_model_path.name}")
-        except Exception as e:
-            pass
 
     if model is None and available_models:
         model = list(available_models.values())[0]
@@ -296,21 +293,66 @@ def enhance_field_image(img_bgr):
 
 
 def image_quality_check(img_bgr):
+    """
+    Evaluates brightness, contrast, sharpness, foliage coverage vs ground/stems,
+    and returns automated retake recommendations. Accurately discriminates botanical
+    crop leaves from laptop screens, monitors, printed documents, signatures, and desks.
+    """
     gray       = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     brightness = float(gray.mean())
     contrast   = float(gray.std())
     sharpness  = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    
+    # Botanical plant tissue analysis:
+    # Naturally encompasses leaf chlorophyll (greens, yellow-greens, olive: H in [18, 92])
+    # as well as chlorotic yellowing and necrotic brown lesions (H in [8, 24])
+    small = cv2.resize(img_bgr, (224, 224))
+    hsv   = cv2.cvtColor(small, cv2.COLOR_BGR2HSV)
+    plant_mask = (hsv[:, :, 0] >= 8) & (hsv[:, :, 0] <= 92) & (hsv[:, :, 1] >= 22) & (hsv[:, :, 2] >= 20)
+    foliage_ratio = float(plant_mask.sum() / (224 * 224))
+
+    # Laptop screens, blank documents, signatures, desks have foliage_ratio < 0.08
+    is_non_leaf = foliage_ratio < 0.08
+    
     warns = []
-    if brightness < 50:    warns.append("too dark")
-    elif brightness > 205: warns.append("too bright")
-    if contrast < 20:      warns.append("low contrast")
-    if sharpness < 60:     warns.append("blurry")
+    if is_non_leaf:
+        warns.append("no crop leaf detected (laptop screen, monitor, document, signature, or non-plant object)")
+    if brightness < 30:
+        warns.append("too dark (poor illumination)")
+    elif brightness > 235:
+        warns.append("overexposed / glare")
+    if contrast < 15:
+        warns.append("low contrast")
+    if sharpness < 40:
+        warns.append("out-of-focus blur")
+    
+    retake_recommended = len(warns) > 0 or is_non_leaf or sharpness < 40
+    if is_non_leaf:
+        retake_reason = (
+            "No crop leaf detected in the photo (appears to be a laptop screen, monitor, document, signature, or non-plant object). "
+            "Please capture an actual crop leaf."
+        )
+    elif sharpness < 40:
+        retake_reason = "Photo is too blurry or out of focus. Please steady the camera and capture a clear close-up."
+    elif brightness < 30:
+        retake_reason = "Photo is too dark for optical diagnosis. Please illuminate the leaf with natural ambient daylight."
+    elif brightness > 235:
+        retake_reason = "Severe glare or overexposure detected. Please avoid flash reflection on the leaf."
+    elif retake_recommended:
+        retake_reason = f"Camera acquisition issues detected: {', '.join(warns)}. Please retake a clear close-up of the leaf."
+    else:
+        retake_reason = ""
+
     return {
-        "ok"        : len(warns) == 0,
-        "brightness": round(brightness, 2),
-        "contrast"  : round(contrast, 2),
-        "sharpness" : round(sharpness, 2),
-        "warnings"  : warns,
+        "ok"                : len(warns) == 0,
+        "is_non_leaf"       : is_non_leaf,
+        "brightness"        : round(brightness, 2),
+        "contrast"          : round(contrast, 2),
+        "sharpness"         : round(sharpness, 2),
+        "foliage_ratio"     : round(foliage_ratio, 4),
+        "warnings"          : warns,
+        "retake_recommended": retake_recommended,
+        "retake_reason"     : retake_reason
     }
 
 
@@ -398,42 +440,90 @@ def compute_spread_risk(disease_label, weather):
     return round(score, 3), level, explanation
 
 
-def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None):
-    """Run the full prediction pipeline and return a structured result dict."""
+def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None, force=False):
+    """Run the full prediction pipeline and return a structured result dict. Supports force=True to bypass quality filters."""
     active_model = model
     used_arch = "mobilenet_v3"
-    if model_choice and model_choice.lower() in available_models:
-        active_model = available_models[model_choice.lower()]
-        used_arch = model_choice.lower()
-    elif "efficientnet" in available_models and model_choice == "efficientnet":
+
+    if model_choice and model_choice.lower() in ("efficientnet", "efficientnet_b0"):
+        if "efficientnet" not in available_models:
+            raise ValueError(
+                "EfficientNet-B0 model is not trained yet. "
+                "Please train it using notebook '03_train_efficientnet_b0.ipynb', "
+                "or select MobileNetV3."
+            )
         active_model = available_models["efficientnet"]
         used_arch = "efficientnet_b0"
+    elif model_choice and model_choice.lower() in ("mobilenet", "mobilenet_v3"):
+        active_model = available_models.get("mobilenet", model)
+        used_arch = "mobilenet_v3"
+    elif model_choice and model_choice.lower() in available_models:
+        active_model = available_models[model_choice.lower()]
+        used_arch = model_choice.lower()
+
+    quality  = image_quality_check(img_bgr)
+    severity = severity_proxy(img_bgr)
+
+    # 0. Immediate guard against non-leaf / screen / document / unreadable photos (bypassed if force=True)
+    if quality.get("retake_recommended") and not force:
+        is_non_leaf = (
+            quality.get("is_non_leaf", False)
+            or quality.get("foliage_ratio", 1.0) < 0.08
+            or "no crop leaf detected" in " ".join(quality.get("warnings", []))
+        )
+        retake_msg = (
+            "No crop leaf detected in the photo (appears to be a laptop screen, monitor, document, signature, or non-plant object). "
+            "Botanical diagnostics and treatments are withheld to prevent false reports."
+            if is_non_leaf
+            else (quality.get("retake_reason") or "Photo quality is unsuitable for reliable disease diagnosis. Please retake the photo.")
+        )
+        return {
+            "prediction"        : "unrecognized_sample",
+            "display_name"      : "Unrecognized / Non-Crop Image" if is_non_leaf else "Retake Required",
+            "is_valid_leaf"     : False,
+            "retake_recommended": True,
+            "retake_reason"     : retake_msg,
+            "confidence"        : 0.0,
+            "confidence_pct"    : 0.0,
+            "confidence_tier"   : "retake required",
+            "top3"              : [],
+            "quality"           : quality,
+            "severity"          : {"severity": "unclassified (retake required)", "lesion_ratio": 0.0},
+            "gradcam"           : None,
+            "advice"            : None,
+            "spread_risk"       : None,
+            "mode"              : "field" if field_mode else "lab",
+            "architecture"      : used_arch,
+            "live_weather"      : weather is not None,
+            "demo_mode"         : False,
+            "forced"            : False,
+        }
 
     if active_model is None or not class_names:
-        # Fallback / demo mode
+        # Fallback / demo mode for valid leaves when weights missing
         demo_gc = generate_gradcam_and_affected_pct(img_bgr, 0, "tomato_early_blight", weather=weather, grad_model=grad_model)
         return {
-            "prediction"     : "tomato_early_blight",
-            "confidence"     : 0.87,
-            "confidence_pct" : 87.0,
-            "confidence_tier": "high confidence",
-            "top3"           : [
+            "prediction"        : "tomato_early_blight",
+            "confidence"        : 0.87,
+            "confidence_pct"    : 87.0,
+            "confidence_tier"   : "high confidence",
+            "is_valid_leaf"     : True,
+            "retake_recommended": False,
+            "forced"            : force,
+            "top3"              : [
                 ["tomato_early_blight", 0.87],
                 ["tomato_late_blight",  0.08],
                 ["tomato_healthy",      0.03],
             ],
-            "quality"        : image_quality_check(img_bgr),
-            "severity"       : severity_proxy(img_bgr),
-            "gradcam"        : demo_gc,
-            "advice"         : get_care_advice("tomato_early_blight"),
-            "spread_risk"    : None,
-            "mode"           : "field" if field_mode else "lab",
-            "architecture"   : used_arch,
-            "demo_mode"      : True,
+            "quality"           : quality,
+            "severity"          : severity,
+            "gradcam"           : demo_gc,
+            "advice"            : get_care_advice("tomato_early_blight"),
+            "spread_risk"       : None,
+            "mode"              : "field" if field_mode else "lab",
+            "architecture"      : used_arch,
+            "demo_mode"         : True,
         }
-
-    quality  = image_quality_check(img_bgr)
-    severity = severity_proxy(img_bgr)
 
     if field_mode:
         original = cv2.resize(img_bgr, (IMG_SIZE, IMG_SIZE))
@@ -466,6 +556,34 @@ def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None):
         all_probs  = {class_names[i]: float(pred[i]) for i in range(len(class_names))}
 
     best_class = class_names[class_idx]
+
+    # Guard against model recognizing background clutter (unless force is requested)
+    if best_class == "background_without_leaves" and not force:
+        quality["retake_recommended"] = True
+        if "non-leaf background surface detected" not in quality["warnings"]:
+            quality["warnings"].append("non-leaf background surface detected")
+        return {
+            "prediction"        : "background_without_leaves",
+            "display_name"      : "Non-Crop Background Detected",
+            "is_valid_leaf"     : False,
+            "retake_recommended": True,
+            "retake_reason"     : "The model identified this photo as background clutter or a non-leaf object. Please capture a clear close-up of a crop leaf.",
+            "confidence"        : 0.0,
+            "confidence_pct"    : 0.0,
+            "confidence_tier"   : "retake required",
+            "top3"              : [],
+            "quality"           : quality,
+            "severity"          : {"severity": "non-crop background", "lesion_ratio": 0.0},
+            "gradcam"           : None,
+            "advice"            : None,
+            "spread_risk"       : None,
+            "mode"              : "field" if field_mode else "lab",
+            "architecture"      : used_arch,
+            "live_weather"      : weather is not None,
+            "demo_mode"         : False,
+            "forced"            : False,
+        }
+
     top3 = sorted(all_probs.items(), key=lambda x: x[1], reverse=True)[:3]
 
     conf_tier = ("high confidence" if confidence >= 0.85
@@ -477,30 +595,34 @@ def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None):
         risk_score, risk_level, risk_expl = compute_spread_risk(best_class, weather)
         spread_risk = {"score": risk_score, "level": risk_level, "explanation": risk_expl}
 
+    active_grad_model = build_gradcam_model(active_model) if active_model is not None else grad_model
     gc_result = generate_gradcam_and_affected_pct(
-        img_bgr, class_idx, best_class, weather=weather, grad_model=grad_model, img_size=IMG_SIZE
+        img_bgr, class_idx, best_class, weather=weather, grad_model=active_grad_model, img_size=IMG_SIZE
     )
 
     return {
-        "prediction"     : best_class,
-        "confidence"     : round(confidence, 4),
-        "confidence_pct" : round(confidence * 100, 2),
-        "confidence_tier": conf_tier,
-        "top3"           : top3,
-        "quality"        : quality,
-        "severity"       : severity,
-        "gradcam"        : gc_result,
-        "advice"         : get_care_advice(best_class),
-        "spread_risk"    : spread_risk,
-        "mode"           : "field" if field_mode else "lab",
-        "architecture"   : used_arch,
-        "live_weather"   : weather is not None,
-        "demo_mode"      : False,
+        "prediction"        : best_class,
+        "is_valid_leaf"     : True,
+        "retake_recommended": False,
+        "forced"            : force,
+        "confidence"        : round(confidence, 4),
+        "confidence_pct"    : round(confidence * 100, 2),
+        "confidence_tier"   : conf_tier,
+        "top3"              : top3,
+        "quality"           : quality,
+        "severity"          : severity,
+        "gradcam"           : gc_result,
+        "advice"            : get_care_advice(best_class),
+        "spread_risk"       : spread_risk,
+        "mode"              : "field" if field_mode else "lab",
+        "architecture"      : used_arch,
+        "live_weather"      : weather is not None,
+        "demo_mode"         : False,
     }
 
 
-def predict_with_context(img_bgr, field_mode=True, weather=None, model_choice=None):
+def predict_with_context(img_bgr, field_mode=True, weather=None, model_choice=None, force=False):
     """Run one prediction and enrich it with trend-friendly fields."""
-    result = run_prediction(img_bgr, field_mode=field_mode, weather=weather, model_choice=model_choice)
+    result = run_prediction(img_bgr, field_mode=field_mode, weather=weather, model_choice=model_choice, force=force)
     result["severity_score"] = severity_numeric(result.get("severity", {}))
     return result

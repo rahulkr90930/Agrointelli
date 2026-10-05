@@ -692,6 +692,104 @@
     .demo-box { background:rgba(6,182,212,0.05); border:1px solid rgba(6,182,212,0.18); }
     .demo-box p { font-size:0.78rem; color:#0891b2; }
 
+    /* Retake & Non-Leaf Sample Shield */
+    .retake-shield-card {
+      background: #ffffff;
+      border: 1.5px solid rgba(245,158,11,0.35);
+      border-radius: var(--r-lg);
+      padding: 1.75rem;
+      box-shadow: 0 10px 25px -5px rgba(245,158,11,0.12), var(--sh-sm);
+      animation: fadeIn 0.3s ease-out;
+    }
+    .rsc-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .rsc-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: rgba(245,158,11,0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      flex-shrink: 0;
+    }
+    .rsc-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0.2rem 0.6rem;
+      background: rgba(245,158,11,0.15);
+      color: #b45309;
+      border-radius: 12px;
+      margin-bottom: 0.25rem;
+    }
+    .rsc-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--green-xdark);
+      margin: 0;
+    }
+    .rsc-desc {
+      font-size: 0.88rem;
+      color: var(--text-2);
+      line-height: 1.6;
+      margin-bottom: 1.1rem;
+      background: rgba(245,158,11,0.06);
+      border-left: 3px solid var(--amber);
+      padding: 0.75rem 1rem;
+      border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    }
+    .rsc-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .retake-warn-chip {
+      font-size: 0.74rem;
+      font-weight: 600;
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid rgba(245,158,11,0.3);
+      border-radius: 16px;
+      padding: 0.25rem 0.65rem;
+    }
+    .rsc-tips {
+      background: rgba(16,185,129,0.04);
+      border: 1px solid rgba(16,185,129,0.15);
+      border-radius: var(--r-md);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .rsc-tips strong {
+      font-size: 0.82rem;
+      color: var(--green-xdark);
+      display: block;
+      margin-bottom: 0.45rem;
+    }
+    .rsc-tips ul {
+      margin: 0;
+      padding-left: 1.2rem;
+      font-size: 0.78rem;
+      color: var(--text-2);
+      line-height: 1.65;
+    }
+    .rsc-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      font-weight: 700;
+    }
+
     /* Weather widget */
     .wx-widget { background:rgba(16,185,129,0.03); border:1px solid var(--border); border-radius:var(--r-md); padding:1.1rem; }
     .wx-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem; }
@@ -1043,7 +1141,7 @@
               <div class="mc-icon">🎯</div>
               <div>
                 <div class="mc-title">EfficientNet-B0</div>
-                <div class="mc-desc">Deep Fusion &bull; Precision</div>
+                <div class="mc-desc" id="desc-arch-efficientnet">Deep Fusion &bull; Precision</div>
               </div>
             </div>
           </div>
@@ -1059,6 +1157,21 @@
             </div>
             <label class="switch">
               <input type="checkbox" id="use-weather" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Force Diagnostic toggle -->
+        <div>
+          <div class="ctrl-section-label">🔬 Force Mode</div>
+          <div class="toggle-pill">
+            <div class="tp-info">
+              <div class="tp-title">Force Diagnostic Mode</div>
+              <div class="tp-desc">Bypass quality/retake checks &amp; force full botanical diagnosis</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="force-diag-toggle" />
               <span class="slider"></span>
             </label>
           </div>
@@ -1225,14 +1338,18 @@
 
     <!-- Results -->
     <div id="results-view">
-      <div class="results-flow">
+      <!-- Retake Shield: displayed when photo is non-crop, signature, or unreadable -->
+      <div id="retake-shield-wrap" style="display:none;"></div>
+
+      <div class="results-flow" id="valid-diag-flow">
 
         <!-- Hero banner -->
         <div class="hero-banner">
           <div>
-            <div class="hb-tag" style="display:flex;align-items:center;gap:0.5rem;">
+            <div class="hb-tag" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
               <span>Primary Diagnosis</span>
               <span id="res-arch-badge" style="display:none;padding:0.15rem 0.55rem;background:rgba(255,255,255,0.22);border-radius:12px;font-size:0.75rem;font-weight:600;text-transform:none;letter-spacing:normal;">⚡ MobileNetV3</span>
+              <span id="res-forced-badge" style="display:none;padding:0.15rem 0.55rem;background:#f59e0b;color:#1e293b;border-radius:12px;font-size:0.75rem;font-weight:700;text-transform:none;letter-spacing:normal;">⚡ Forced Diagnostic</span>
             </div>
             <div class="hb-name" id="res-disease">—</div>
             <button type="button" class="header-journal-btn" id="btn-save-current-scan" style="margin-top:0.75rem;background:#fff;border-color:var(--green);font-size:0.75rem;">
@@ -1630,6 +1747,15 @@
         healthRetries = 0;
         txt.textContent  = d.model_loaded ? 'Model Server Online' : 'Demo Mode Active';
         pill.className   = 'status-pill online';
+        window.efficientNetReady = !!d.efficientnet_ready;
+        const effDesc = document.getElementById('desc-arch-efficientnet');
+        if (effDesc) {
+          if (window.efficientNetReady) {
+            effDesc.innerHTML = '<span style="color:var(--green-dark);font-weight:600;">● Trained &amp; Ready</span> &bull; Precision';
+          } else {
+            effDesc.innerHTML = '<span style="color:#d97706;font-weight:600;">⚠️ Not Trained Yet</span> &bull; Notebook 03';
+          }
+        }
       } else throw new Error();
     } catch {
       if (healthRetries < 8) {
@@ -1722,6 +1848,10 @@
   let selectedArchitecture = 'mobilenet';
 
   function selectModelArch(arch) {
+    if (arch === 'efficientnet' && !window.efficientNetReady) {
+      showError('EfficientNet-B0 is not trained yet. Train it using notebook "03_train_efficientnet_b0.ipynb" to generate "model_efficientnet_b0.keras", or use MobileNetV3.');
+      return;
+    }
     selectedArchitecture = arch;
     const cardMob = document.getElementById('card-arch-mobilenet');
     const cardEff = document.getElementById('card-arch-efficientnet');
@@ -1847,6 +1977,7 @@
     }
     const mode       = document.querySelector('input[name="mode"]:checked').value;
     const useWeather = document.getElementById('use-weather').checked;
+    const forceDiag  = document.getElementById('force-diag-toggle')?.checked || false;
     setLoading(true); clearResults();
     document.getElementById('diagnostics-section').scrollIntoView({ behavior:'smooth', block:'start' });
 
@@ -1854,6 +1985,7 @@
     fd.append('image', selectedFile); fd.append('mode', mode);
     fd.append('use_weather', useWeather ? 'true' : 'false');
     fd.append('architecture', selectedArchitecture);
+    fd.append('force', forceDiag ? 'true' : 'false');
 
     try {
       const r = await fetch(`${API}/predict`, { method:'POST', body:fd });
@@ -1903,6 +2035,40 @@
     finally  { setLoadingBatch(false); }
   });
 
+  /* ── Force Diagnostic Trigger ─────────────────────────────── */
+  window.triggerForceDiagnostic = async function() {
+    if (!selectedFile) {
+      zone.classList.add('shake'); setTimeout(() => zone.classList.remove('shake'), 450);
+      fileInput.click(); return;
+    }
+    const mode       = document.querySelector('input[name="mode"]:checked')?.value || 'field';
+    const useWeather = document.getElementById('use-weather')?.checked ?? true;
+    setLoading(true);
+    document.getElementById('diagnostics-section').scrollIntoView({ behavior:'smooth', block:'start' });
+
+    const fd = new FormData();
+    fd.append('image', selectedFile);
+    fd.append('mode', mode);
+    fd.append('use_weather', useWeather ? 'true' : 'false');
+    fd.append('architecture', selectedArchitecture);
+    fd.append('force', 'true');
+
+    try {
+      const r = await fetch(`${API}/predict`, { method:'POST', body:fd });
+      if (!r.ok) { const e = await r.json(); showError(e.error||'Server error.'); return; }
+      const data = await r.json();
+      data.forced = true;
+      data.is_valid_leaf = true;
+      data.retake_recommended = false;
+      renderResults(data);
+      if (data.weather) renderWeather(data.weather);
+    } catch {
+      showError('Cannot reach Flask service. Verify app.py is running on port 5000.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   /* ── Render Single Results ───────────────────────────────── */
   function renderResults(d) {
     lastScanResult = d;
@@ -1910,8 +2076,60 @@
     $show('results-view'); $hide('placeholder-view');
     document.getElementById('batch-prog-wrap').style.display = 'none';
 
+    const isRetake = !d.forced && (d.retake_recommended || d.is_valid_leaf === false || d.prediction === 'unrecognized_sample' || d.prediction === 'background_without_leaves');
+    const retakeShield = document.getElementById('retake-shield-wrap');
+    const validDiagFlow = document.getElementById('valid-diag-flow');
+
+    if (isRetake) {
+      if (validDiagFlow) validDiagFlow.style.display = 'none';
+      if (retakeShield) {
+        retakeShield.style.display = 'block';
+        const reason = d.retake_reason || d.quality?.retake_reason || 'Photo quality or framing is unsuitable for botanical disease diagnosis.';
+        const warns = (d.quality?.warnings || []).map(w => `<span class="retake-warn-chip">⚠️ ${w}</span>`).join(' ');
+        retakeShield.innerHTML = `
+          <div class="retake-shield-card">
+            <div class="rsc-header">
+              <div class="rsc-icon">📷⚠️</div>
+              <div>
+                <div class="rsc-badge">Diagnostic Suspended &bull; Retake Required</div>
+                <h3 class="rsc-title">Cannot Reliably Diagnose This Image</h3>
+              </div>
+            </div>
+            <p class="rsc-desc">${reason}</p>
+            ${warns ? `<div class="rsc-chips">${warns}</div>` : ''}
+            <div class="rsc-tips">
+              <strong>🌿 Guidelines for Accurate Leaf Analysis:</strong>
+              <ul>
+                <li>Frame an <strong>actual crop leaf</strong> filling 50% to 80% of the viewfinder</li>
+                <li>Avoid non-plant objects (e.g. laptop screens, electronic displays, documents, signatures, furniture)</li>
+                <li>Hold the camera steady so leaf veins and surface lesions are in sharp focus</li>
+                <li>Capture under natural daylight, avoiding flash reflection and deep shadows</li>
+              </ul>
+            </div>
+            <div class="rsc-actions" style="display:flex;gap:12px;margin-top:1.25rem;flex-wrap:wrap;">
+              <button type="button" class="btn btn-green rsc-btn" onclick="document.getElementById('file-input').click()" style="flex:1;min-width:180px;">
+                📸 Retake / Choose New Leaf Photo
+              </button>
+              <button type="button" class="btn rsc-btn" id="btn-force-diag" onclick="window.triggerForceDiagnostic()" style="flex:1;min-width:180px;background:linear-gradient(135deg, #f59e0b, #d97706);color:#fff;font-weight:700;border:none;box-shadow:0 4px 14px rgba(217,119,6,0.35);cursor:pointer;padding:0.75rem 1.25rem;border-radius:10px;">
+                ⚡ Force Diagnostic Anyway
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    if (retakeShield) retakeShield.style.display = 'none';
+    if (validDiagFlow) validDiagFlow.style.display = 'flex';
+
     const title = d.prediction.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
     document.getElementById('res-disease').textContent = title;
+
+    const forcedBadge = document.getElementById('res-forced-badge');
+    if (forcedBadge) {
+      forcedBadge.style.display = d.forced ? 'inline-block' : 'none';
+    }
 
     const archBadge = document.getElementById('res-arch-badge');
     if (archBadge) {
@@ -2023,9 +2241,18 @@
       ? `<div class="risk-box"><div class="risk-head"><span class="risk-badge risk-${sr.level||'LOW'}">${sr.level||'LOW'} spreading risk</span><span class="risk-score">Epidemic Index: ${(sr.score*100).toFixed(0)}%</span></div><p class="risk-desc">${sr.explanation}</p></div>`
       : `<div style="font-size:0.78rem;color:var(--text-3);font-style:italic;padding:0.4rem;">Enable the weather switch to calculate spread indexes.</div>`;
 
-    // Quality + demo
+    // Quality + retake alert + demo
     let qHtml = '';
-    if (q.warnings?.length) qHtml += `<div class="warn-box"><span>⚠️</span><div><p><strong>Camera warnings:</strong> ${q.warnings.join(', ')}.</p><p style="font-size:0.72rem;color:var(--text-3);margin-top:2px;">Re-acquire in neutral ambient light.</p></div></div>`;
+    if (q.retake_recommended || q.warnings?.length) {
+      const reason = q.retake_reason || `Camera alerts: ${q.warnings?.join(', ')}. Please re-acquire close-up in natural ambient light.`;
+      qHtml += `<div class="warn-box" style="border-left:4px solid var(--amber);background:rgba(245,158,11,0.08);">
+        <span style="font-size:1.2rem;">📷</span>
+        <div>
+          <p style="color:#d97706;font-weight:600;">Retake Suggested for Best Accuracy</p>
+          <p style="font-size:0.75rem;color:var(--text-2);margin-top:2px;">${reason}</p>
+        </div>
+      </div>`;
+    }
     if (d.demo_mode) qHtml += `<div class="demo-box"><span>ℹ️</span><div><p><strong>Mock prediction loaded</strong></p><p style="font-size:0.72rem;color:var(--text-3);margin-top:2px;">Model weights not found — running fallback demo.</p></div></div>`;
     document.getElementById('quality-wrap').innerHTML = qHtml;
 
@@ -2139,6 +2366,10 @@
   }
   function clearResults() {
     $hide('results-view'); $show('placeholder-view'); $hide('error-panel');
+    const rsw = document.getElementById('retake-shield-wrap');
+    if (rsw) { rsw.style.display = 'none'; rsw.innerHTML = ''; }
+    const vdf = document.getElementById('valid-diag-flow');
+    if (vdf) vdf.style.display = 'flex';
     document.getElementById('wx-card').style.display='none';
     document.getElementById('wx-pending').style.display='block';
     document.getElementById('batch-prog-wrap').style.display='none';
@@ -2222,6 +2453,7 @@
       currentUser = data.user;
       localStorage.setItem('agro_user', JSON.stringify(currentUser));
       updateAuthUI();
+      refreshRecordCount();
       closeAuthModal();
     } catch {
       errEl.textContent = 'Cannot connect to backend auth service.';
@@ -2252,6 +2484,7 @@
       currentUser = data.user;
       localStorage.setItem('agro_user', JSON.stringify(currentUser));
       updateAuthUI();
+      refreshRecordCount();
       closeAuthModal();
     } catch {
       errEl.textContent = 'Cannot connect to backend registration service.';
@@ -2263,12 +2496,29 @@
     currentUser = null;
     localStorage.removeItem('agro_user');
     updateAuthUI();
+    refreshRecordCount();
     closeAuthModal();
   }
 
+  function handleLogout() {
+    currentUser = null;
+    localStorage.removeItem('agro_user');
+    updateAuthUI();
+    refreshRecordCount();
+  }
+
   /* ── Journal (Past Disease Records) ───────────────────────── */
+  function getGuestSessionId() {
+    let gid = localStorage.getItem('agro_guest_id');
+    if (!gid) {
+      gid = 'guest_' + Math.random().toString(36).substring(2, 10);
+      localStorage.setItem('agro_guest_id', gid);
+    }
+    return gid;
+  }
+
   function getCurrentUserId() {
-    return currentUser ? (currentUser.user_id || currentUser.username) : 'guest';
+    return currentUser ? (currentUser.user_id || currentUser.username) : getGuestSessionId();
   }
 
   async function refreshRecordCount() {

@@ -178,9 +178,11 @@ class StorageManager:
             return data.get("records", {}).get(record_id)
 
     def get_user_records(self, user_id):
+        if not user_id:
+            user_id = "guest"
         if self.is_mongo:
-            query = {"$or": [{"user_id": user_id}, {"user_id": "guest"}]} if (user_id and user_id != "guest") else {}
-            cursor = self.db.leaf_records.find(query).sort("updated_at", -1)
+            # Strictly isolate: only return records matching the requested user_id
+            cursor = self.db.leaf_records.find({"user_id": user_id}).sort("updated_at", -1)
             docs = []
             for d in cursor:
                 d["_id"] = str(d["_id"])
@@ -188,26 +190,29 @@ class StorageManager:
             return docs
         else:
             data = self._load_fallback()
-            if user_id and user_id != "guest":
-                items = [r for r in data.get("records", {}).values() if r.get("user_id") in (user_id, "guest")]
-            else:
-                items = list(data.get("records", {}).values())
+            items = [r for r in data.get("records", {}).values() if r.get("user_id") == user_id]
             items.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
             return items
 
     def delete_record(self, record_id, user_id=None):
         if not record_id:
             return False
+        query = {"record_id": record_id}
+        if user_id:
+            query["user_id"] = user_id
         if self.is_mongo:
-            # 1. Match directly by unique record_id
-            res = self.db.leaf_records.delete_one({"record_id": record_id})
+            # 1. Match directly by unique record_id (scoped to user_id if provided)
+            res = self.db.leaf_records.delete_one(query)
             if res.deleted_count > 0:
                 return True
             # 2. Match by MongoDB ObjectId if passed
             try:
                 from bson import ObjectId
                 if ObjectId.is_valid(record_id):
-                    res = self.db.leaf_records.delete_one({"_id": ObjectId(record_id)})
+                    del_q = {"_id": ObjectId(record_id)}
+                    if user_id:
+                        del_q["user_id"] = user_id
+                    res = self.db.leaf_records.delete_one(del_q)
                     if res.deleted_count > 0:
                         return True
             except Exception:
@@ -217,9 +222,10 @@ class StorageManager:
             data = self._load_fallback()
             records = data.get("records", {})
             if record_id in records:
-                del records[record_id]
-                self._save_fallback(data)
-                return True
+                if not user_id or records[record_id].get("user_id") == user_id:
+                    del records[record_id]
+                    self._save_fallback(data)
+                    return True
             return False
 
 

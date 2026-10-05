@@ -92,6 +92,8 @@ def api_status():
         "status": "online",
         "modules": ["database", "weather", "gradcam", "inference", "batch"],
         "models_available": list(av_models.keys()),
+        "mobilenet_ready": "mobilenet" in av_models or m is not None,
+        "efficientnet_ready": "efficientnet" in av_models,
         "model_loaded": len(av_models) > 0 or m is not None,
         "classes_count": len(c_names),
         "mongo_connected": db_store.is_mongo
@@ -103,6 +105,8 @@ def health():
     return jsonify({
         "status": "ok",
         "model_loaded": len(available_models) > 0 or model is not None,
+        "mobilenet_ready": "mobilenet" in available_models or model is not None,
+        "efficientnet_ready": "efficientnet" in available_models,
         "tf_available": TF_AVAILABLE,
         "classes": len(class_names),
         "storage_mode": "MongoDB" if db_store.is_mongo else "Resilient Local",
@@ -190,8 +194,6 @@ def chat():
     user_records = []
     try:
         user_records = db_store.get_user_records(user_id)
-        if not user_records and user_id != "guest":
-            user_records = db_store.get_user_records("guest")
     except Exception as e:
         print(f"MongoDB past records retrieval notice: {e}")
 
@@ -289,6 +291,8 @@ def predict():
     use_w_param = request.form.get("use_weather") or request.form.get("weather") or "true"
     use_weather = use_w_param.lower() in ("true", "1", "yes")
     arch = request.form.get("architecture") or request.args.get("arch")
+    force_param = request.form.get("force") or request.args.get("force") or "false"
+    force_diagnostic = str(force_param).lower() in ("true", "1", "yes")
 
     weather = None
     if use_weather:
@@ -296,7 +300,7 @@ def predict():
         weather = weather_payload.get("weather")
 
     try:
-        result = run_prediction(img_bgr, field_mode=field_mode, weather=weather, model_choice=arch)
+        result = run_prediction(img_bgr, field_mode=field_mode, weather=weather, model_choice=arch, force=force_diagnostic)
         result["weather"] = weather
         return jsonify(result)
     except Exception as e:
@@ -332,6 +336,8 @@ def batch_predict():
     field_mode = request.form.get("mode", "field") == "field"
     use_weather = request.form.get("use_weather", "false").lower() == "true"
     arch = request.form.get("architecture") or request.args.get("arch")
+    force_param = request.form.get("force") or request.args.get("force") or "false"
+    force_diagnostic = str(force_param).lower() in ("true", "1", "yes")
 
     session_weather = None
     if use_weather:
@@ -345,7 +351,7 @@ def batch_predict():
         if img_bgr is None:
             return jsonify({"error": f"Could not decode image for {label}. Use JPG or PNG."}), 400
 
-        result = predict_with_context(img_bgr, field_mode=field_mode, weather=session_weather, model_choice=arch)
+        result = predict_with_context(img_bgr, field_mode=field_mode, weather=session_weather, model_choice=arch, force=force_diagnostic)
         item = {
             "label": label,
             "index": idx + 1,
