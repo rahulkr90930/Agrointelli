@@ -23,6 +23,7 @@ build/
 # Generated project artifacts
 agrointelli_data/
 backend/models/*.keras
+!backend/models/agrointelli_phase1_final.keras
 backend/models/*.h5
 backend/models/*.hdf5
 backend/models/*.savedmodel/

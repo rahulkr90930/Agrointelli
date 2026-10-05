@@ -48,61 +48,67 @@ except Exception as e:
     print(f"⚠ Chatbot initialization notice: {e}")
 
 
-SYSTEM_PROMPT = """You are AgroIntelli AI (AgroBot), a specialized, scientific, yet practical agricultural pathologist and precision crop advisor.
-Your primary role is to assist farmers, agronomists, and greenhouse managers in diagnosing, understanding, and managing plant diseases.
+SYSTEM_PROMPT = """You are AgroIntelli AI (AgroBot), an intelligent, friendly, and practical agricultural pathologist and precision crop consultant.
 
-CRITICAL RULES:
-1. DOMAIN SPECIFICITY: You are strictly an agronomy and plant pathology specialist. Stay focused on crops, plant diseases, pathogens, chemical fungicides/bactericides, biological/organic solutions, weather-driven spore progression, irrigation, and field management. Do NOT act as a general conversational bot for non-agricultural topics.
-2. SYNTHESIZE SCAN TELEMETRY: Always integrate the user's active leaf scan data provided in the prompt:
-   - Current Leaf Prediction & Diagnostic Confidence
-   - Grad-CAM affected lesion area percentage (% of leaf blade covered)
-   - Live Weather Telemetry (temperature, relative humidity %, rainfall mm/h, wind)
-   - Canonical Knowledge Profile (pathogen taxonomy, chemical treatments, organic remedies, prevention)
-3. MONGODB SCAN JOURNAL & NO-PHOTO ACCESS:
-   - You have direct access to the farmer's MongoDB crop database.
-   - When the user asks about their previous scans, past diseases, or progression, synthesize their MongoDB scan journal.
-   - If NO new photo is uploaded, ground your consultation on their latest recorded scan from MongoDB, stating clearly that you are accessing their past field records from MongoDB.
-4. GROUNDED AGRONOMIC REASONING:
-   - When humidity is high (>=70%) or rain is present, explain how free moisture promotes spore germination and bacterial splash dispersal.
-   - For chemical treatments, recommend standard agricultural concentrations (e.g., Mancozeb 2-2.5 g/L, Chlorothalonil 2 ml/L, Copper Oxychloride 3 g/L) and emphasize proper application timing (early morning or late afternoon to prevent phytotoxicity/sun scorch).
-   - Offer organic / biological alternatives (e.g., cold-pressed neem oil 5 ml/L with mild surfactant, Trichoderma viride, dilute potassium bicarbonate).
-   - If progression data is provided (e.g., Day 1 to Day 5 with spread rate), explicitly evaluate whether the infection is expanding or under control.
-5. TONE & STRUCTURE:
-   - Structured, concise, and clear with bullet points and bold highlights.
-   - Action-oriented: Provide immediate containment steps, spray schedule, and future preventative practices.
+BEHAVIOR GUIDELINES:
+1. ADDRESS THE USER'S SPECIFIC QUESTION DIRECTLY:
+   - Always answer what the user actually asked first and foremost.
+   - For simple greetings ("hi", "hello", "hey", "who are you"), reply with a warm, natural 1-2 sentence welcome. Do NOT dump unsolicited chemical spray dosages or disclaimers.
+   - For general agricultural questions (irrigation/watering, soil, fertilization, sunlight, pruning), provide clear, practical horticultural advice directly relevant to the question.
+   - For non-agricultural topics (general chit-chat, math, programming, unrelated queries), provide a polite, concise answer and gently offer assistance with crop health and agronomy.
+
+2. CONTEXT AWARENESS (WHEN RELEVANT):
+   - When the user asks about diagnosing a leaf, treating an infection, or understanding symptoms, leverage the provided telemetry:
+     * Diagnostic prediction & confidence
+     * Grad-CAM lesion affected percentage (% of leaf blade)
+     * Microclimate weather (temperature, humidity %, rainfall)
+     * Scientific disease profile (pathogen, chemical dosage, organic remedies)
+   - If the user asks about their previous field records or past scans, consult the provided MongoDB history.
+   - If NO leaf scan is active and the user asks a general question, answer their question directly without unprompted chemical treatments.
+
+3. PRACTICAL DOSAGES & PREVENTATIVE CARE (WHEN TREATMENT IS ASKED):
+   - Provide standard concentrations (e.g., Mancozeb 2-2.5 g/L, Chlorothalonil 2 ml/L, Copper Oxychloride 3 g/L, cold-pressed neem oil 5 ml/L).
+   - Highlight weather-sensitive application tips (spray in early morning/late afternoon, avoid spraying right before rain).
+
+4. TONE & STRUCTURE:
+   - Natural, conversational, and direct. Use bullet points and bold highlights for readability when helpful.
 """
 
 
 FAST_MODELS = [
+    "models/gemini-2.5-flash",
+    "models/gemini-2.0-flash",
+    "models/gemini-1.5-flash",
+    "models/gemini-flash-latest",
     "models/gemini-3.5-flash-lite",
-    "models/gemini-3.1-flash-lite",
-    "models/gemini-flash-latest"
+    "models/gemini-3.1-flash-lite"
 ]
 
 FAST_GEN_CONFIG = {
-    "max_output_tokens": 320,
-    "temperature": 0.25,
+    "max_output_tokens": 1024,
+    "temperature": 0.35,
 }
 
 
 def generate_chat_response(user_message, scan_context=None, history=None, language="English"):
     """
-    Generate an ultra-fast agronomic response grounded in live or MongoDB historical telemetry,
+    Generate an intelligent, conversational agronomic response grounded in live or MongoDB historical telemetry,
     disease knowledge, and requested language (English, Hindi, Spanish, etc.).
     """
     if not user_message or not user_message.strip():
         welcome_msgs = {
-            "Hindi": "नमस्ते! मैं एग्रोबॉट हूँ, आपका कृषि सहायक। पत्ती स्कैन करें, अपने मोंगोडीबी (MongoDB) के पिछले रिकॉर्ड देखें या फसल रोग, दवा छिड़काव और मौसम जोखिम के बारे में पूछें।",
-            "Spanish": "¡Hola! Soy AgroBot, su asistente de salud vegetal. Escanee una hoja, revise sus registros pasados de MongoDB o consulte sobre tratamientos.",
+            "Hindi": "नमस्ते! मैं एग्रोबॉट (AgroBot) हूँ, आपका कृषि सहायक। पत्ती स्कैन करें, पिछले रिकॉर्ड देखें या फसल, सिंचाई और रोग उपचार के बारे में कुछ भी पूछें।",
+            "Spanish": "¡Hola! Soy AgroBot, su asistente agrícola y de salud vegetal. Escanee una hoja, revise sus registros de MongoDB o pregúnteme sobre cultivos y tratamientos.",
         }
         return {
-            "reply": welcome_msgs.get(language, "Hello! I am AgroBot, your plant health assistant. Scan a leaf, access your past MongoDB crop records, or ask me anything about crop diseases and treatment sprays."),
+            "reply": welcome_msgs.get(language, "Hello! I am AgroBot, your crop health and agronomy assistant. Scan a leaf, check your past field records, or ask me anything about crops, diseases, irrigation, and care."),
             "grounded": False,
             "model_used": "system"
         }
 
     scan_context = scan_context or {}
-    pred = scan_context.get("prediction", "Unknown / Not Scanned")
+    has_active_scan = bool(scan_context.get("prediction") and scan_context.get("prediction") != "Unknown / Not Scanned")
+    pred = scan_context.get("prediction", "None active")
     conf = scan_context.get("confidence_pct", 0)
     aff_pct = scan_context.get("affected_pct", None)
     weather = scan_context.get("weather", {})
@@ -122,7 +128,7 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
         weather_desc = f"{city} | {temp}°C | {hum}% Humidity | Rain: {rain} mm/h"
 
     knowledge_summary = "General crop consultation"
-    if knowledge and isinstance(knowledge, dict):
+    if knowledge and isinstance(knowledge, dict) and has_active_scan:
         knowledge_summary = (
             f"Pathogen: {knowledge.get('pathogen', 'N/A')}\n"
             f"Favorable Conditions: {knowledge.get('temp_min', '15')}-{knowledge.get('temp_max', '30')}°C, "
@@ -132,34 +138,35 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
             f"Prevention: {knowledge.get('prevention', 'N/A')}"
         )
 
-    data_source_note = "LIVE SCAN"
-    if is_historical:
-        data_source_note = f"PAST MONGODB RECORD (Crop: {plant_name}, No photo currently uploaded)"
+    scan_status_line = "No active leaf scan uploaded in current session"
+    if has_active_scan:
+        scan_status_line = f"Active Leaf Scan: {pred} ({conf}% confidence), Lesion Area: {f'{aff_pct:.1f}%' if aff_pct is not None else 'N/A'}"
+    elif is_historical:
+        scan_status_line = f"Saved MongoDB Record for Crop: {plant_name or 'Past Leaf'}"
 
     mongo_block = ""
     if mongo_summary:
         mongo_block = f"""
-[FARMER MONGODB CROP JOURNAL & PAST SCANS]
+[FARMER MONGODB CROP JOURNAL]
 {mongo_summary}
 """
 
     context_prompt = f"""
-[DIAGNOSTIC TELEMETRY & CONTEXT - SOURCE: {data_source_note}]
-- Plant / Leaf Diagnosis: {pred} ({conf}% confidence)
-- Grad-CAM Affected Lesion Area: {f"{aff_pct:.1f}%" if aff_pct is not None else "Not calculated"}
+[FIELD & TELEMETRY CONTEXT]
+- Scan Status: {scan_status_line}
 - Microclimate Weather: {weather_desc}
-- Progression Timeline: {timeline if timeline else "Single scan baseline"}
-- Scientific Knowledge Grounding:
+- Progression Timeline: {timeline if timeline else "None"}
+- Agronomic Knowledge:
 {knowledge_summary}
 {mongo_block}
-[FARMER QUESTION]
+[USER QUESTION]
 "{user_message}"
 
-[RESPONSE REQUIREMENTS]
-1. Target Language: {language}. Write naturally in {language} (use proper native script, e.g., Devanagari for Hindi).
-2. If answering based on past MongoDB data or if no photo was uploaded, acknowledge that you are reviewing their saved MongoDB field records.
-3. Keep the advice concise, fast, and structured in 3-4 bullet points.
-4. Include specific chemical spray dosage (g/L) or organic recipe, rain precautions, and timing.
+[INSTRUCTIONS]
+1. Target Language: {language} (respond fluently in {language}).
+2. Answer the user's question directly, naturally, and completely.
+3. If this is a greeting or general question, respond conversationally without dumping unprompted chemical treatments or disclaimers.
+4. If the question asks for disease diagnosis, remedies, or past records, use the provided context accurately.
 """
 
     # Try fast model candidates in sequence
@@ -193,76 +200,116 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
 
 
 def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, language="English", is_historical=False, plant_name="", mongo_summary=""):
-    """Generates an immediate, high-quality agronomic response using local knowledge and MongoDB history."""
-    q_lower = query.lower()
+    """Generates an immediate, natural agronomic response using local knowledge and MongoDB history."""
+    q_lower = query.lower().strip()
+
+    # 1. Greetings & Identity
+    if any(q_lower.startswith(g) or q_lower == g for g in ["hi", "hello", "hey", "namaste", "hola", "who are you", "what is your name", "who r u"]):
+        return (
+            "Hello! I am **AgroIntelli AI (AgroBot)**, your intelligent agricultural and crop health assistant.\n\n"
+            "You can upload a leaf photo to diagnose diseases, check your past field records from MongoDB, "
+            "or ask me any questions about watering, soil, crop pests, and treatment sprays. How can I assist you today?"
+        )
+
+    # 2. Watering & Irrigation
+    if any(k in q_lower for k in ["water", "watering", "irrigation", "sinchai", "paani", "how often to water"]):
+        return (
+            "### 💧 Practical Irrigation & Moisture Management\n\n"
+            "Here are recommended watering guidelines for optimal crop vigor and disease prevention:\n\n"
+            "1. **Method**: Always use **drip irrigation or ground-level soakers** at the root zone rather than overhead sprinklers. Wet foliage is the #1 trigger for fungal spore germination and bacterial leaf spots.\n"
+            "2. **Timing**: Irrigate **early in the morning (6:00 AM – 9:00 AM)**. Any incidental moisture on the leaves evaporates quickly with morning warmth, minimizing leaf-wetness duration.\n"
+            "3. **Frequency**: Deep, less frequent watering (2–3 times per week, 1–1.5 inches total) promotes deeper root systems compared to shallow daily wetting.\n"
+            "4. **Moisture Check**: Insert a finger or moisture meter 2 inches into the soil. If it feels cool and damp, delay watering to prevent root hypoxia and root rots (*Pythium/Phytophthora*)."
+        )
+
+    # 3. Soil & Fertilization
+    if any(k in q_lower for k in ["soil", "fertilizer", "fertiliser", "khad", "npk", "compost", "manure"]):
+        return (
+            "### 🌱 Soil Health & Balanced Crop Nutrition\n\n"
+            "Healthy soil is the first line of defense against crop stress and disease:\n\n"
+            "1. **Organic Matter**: Incorporate well-aged compost or vermicompost (2–3 inches worked into the topsoil) to improve soil aeration, drainage, and beneficial microbial activity.\n"
+            "2. **Balanced N-P-K**: Avoid excessive nitrogen (N) fertilization, which produces lush, succulent vegetative growth that is highly vulnerable to fungal blight and aphid infestations.\n"
+            "3. **Soil pH**: Most vegetable crops (tomatoes, potatoes, corn) thrive in slightly acidic to neutral soil (pH 6.0–6.8). Test pH annually.\n"
+            "4. **Mulching**: Apply 2 inches of organic straw or wood chips around the crop base to retain soil moisture, suppress weeds, and prevent soil-borne pathogens from splashing onto lower leaves."
+        )
+
+    has_active_disease = bool(pred and pred != "None active" and pred != "Unknown / Not Scanned")
     crop = plant_name or knowledge.get("crop", "your crop")
-    disease = knowledge.get("common_name", pred.replace("_", " ").title())
+    disease = knowledge.get("common_name", pred.replace("_", " ").title()) if has_active_disease else "Crop Health Consultation"
     pathogen = knowledge.get("pathogen", "fungal/bacterial pathogen")
-    chem = knowledge.get("treatment_protocol", "Apply a broad-spectrum protective fungicide (e.g., Mancozeb or Chlorothalonil).")
-    organic = knowledge.get("organic_remedies", "Neem oil spray (5ml/L) and copper-based organic formulations.")
-    prevention = knowledge.get("prevention", "Avoid overhead watering; prune infected leaves to enhance air circulation.")
+    chem = knowledge.get("treatment_protocol", "Apply a broad-spectrum protective fungicide (e.g., Mancozeb 2.5 g/L or Chlorothalonil 2 ml/L).")
+    organic = knowledge.get("organic_remedies", "Cold-pressed neem oil spray (5 ml/L with mild surfactant) or dilute copper hydroxide.")
+    prevention = knowledge.get("prevention", "Ensure good plant spacing, sanitize pruning tools, and water at the root base.")
 
     temp = weather.get("temp_c", 25) if weather else 25
     hum = weather.get("humidity_pct", 65) if weather else 65
     rain = weather.get("rain_1h_mm", 0) if weather else 0
 
-    aff_str = f"covering approximately **{aff_pct:.1f}%** of the leaf surface" if aff_pct is not None else ""
+    aff_str = f"covering approximately **{aff_pct:.1f}%** of the leaf surface" if (aff_pct is not None and has_active_disease) else ""
+    source_prefix = "### 🍃 Historical Field Record (From MongoDB)\n\n" if is_historical else ""
 
-    source_prefix = "### 🍃 AgroIntelli Historical Field Record (From MongoDB)\n\n" if is_historical else ""
-
-    if any(k in q_lower for k in ["spray", "chemical", "medicine", "treatment", "cure", "fungicide"]):
+    # 4. Sprays & Chemical Fungicides
+    if any(k in q_lower for k in ["spray", "chemical", "medicine", "treatment", "cure", "fungicide", "dawa"]):
         return (
-            f"{source_prefix}### 🛡️ Recommended Treatment Protocol for **{disease}** ({pathogen})\n\n"
-            f"Based on your {'saved MongoDB' if is_historical else 'latest'} scan {aff_str}:\n\n"
+            f"{source_prefix}### 🛡️ Recommended Spray Protocol for **{disease}**\n\n"
             f"1. **Chemical Treatment**:\n   - {chem}\n"
-            f"   - *Application Tip*: Spray early in the morning (before 9 AM) or late afternoon. Ensure full coverage on both upper and lower leaf surfaces.\n\n"
-            f"2. **Weather Considerations**:\n   - Current conditions: **{temp}°C, {hum}% humidity, {rain} mm/h rain**.\n"
-            f"   - If rainfall is expected, use a non-ionic spreader/sticker so the spray does not wash off.\n\n"
-            f"3. **Follow-up**:\n   - Re-inspect in 4-6 days to monitor if lesion borders have arrested."
+            f"   - *Application Timing*: Spray in the early morning (before 9 AM) or late afternoon. Coat both upper and lower leaf surfaces.\n\n"
+            f"2. **Weather Safeguards**:\n   - Current conditions: **{temp}°C, {hum}% humidity, {rain} mm/h rain**.\n"
+            f"   - If rain is expected within 4–6 hours, delay spraying or add a sticker/adjuvant so the solution is not washed off.\n\n"
+            f"3. **Follow-up**:\n   - Re-check after 5–7 days to ensure lesion expansion has halted."
         )
 
-    if any(k in q_lower for k in ["organic", "natural", "home", "bio", "neem"]):
+    # 5. Organic Remedies
+    if any(k in q_lower for k in ["organic", "natural", "home", "bio", "neem", "jaivik"]):
         return (
             f"{source_prefix}### 🌿 Organic & Biological Solutions for **{disease}**\n\n"
-            f"For sustainable, chemical-free management:\n\n"
-            f"1. **Organic Formulations**:\n   - {organic}\n"
-            f"   - *Neem Oil Recipe*: Mix 5 ml pure cold-pressed neem oil + 1 ml liquid soap in 1 liter of warm water. Spray every 5 days.\n\n"
-            f"2. **Cultural Controls**:\n   - Immediately excise lower leaves that touch the soil.\n   - Mulch around the base to prevent fungal spores from splashing up from the soil.\n\n"
+            f"1. **Organic Formulation**:\n   - {organic}\n"
+            f"   - *Neem Oil Recipe*: Mix 5 ml pure cold-pressed neem oil + 1 ml mild liquid soap into 1 liter of warm water. Spray every 5–7 days.\n\n"
+            f"2. **Cultural Controls**:\n   - Prune and safely destroy lower infected leaves.\n   - Ensure adequate spacing between plants to maximize airflow.\n\n"
             f"3. **Prevention**:\n   - {prevention}"
         )
 
+    # 6. MongoDB History / Past Records
     if any(k in q_lower for k in ["past", "history", "mongo", "previous", "record", "purani", "pichla"]):
-        history_info = f"\n\n**Your MongoDB Saved Records**:\n{mongo_summary}" if mongo_summary else ""
+        history_info = f"\n\n**Your Saved Field Records**:\n{mongo_summary}" if mongo_summary else ""
         return (
-            f"### 📜 AgroIntelli Field Journal (MongoDB Scan Records)\n\n"
-            f"Here is your historical crop health journal retrieved from MongoDB:\n"
+            f"### 📜 AgroIntelli Field Journal (MongoDB Records)\n\n"
+            f"Here is your historical crop health journal:\n"
             f"- **Latest Saved Crop**: **{crop}**\n"
-            f"- **Condition Diagnosed**: **{disease}** (*{pathogen}*)\n"
-            f"{f'- **Lesion Area**: {aff_pct:.1f}%' if aff_pct is not None else ''}"
+            f"- **Diagnosis**: **{disease}**\n"
+            f"{f'- **Lesion Area**: {aff_pct:.1f}%' if (aff_pct is not None and has_active_disease) else ''}"
             f"{history_info}\n\n"
-            f"**Recommended Next Step**: Continue fungicide/organic preventive spray and check in with a new leaf photo to monitor progression."
+            f"**Next Step**: Upload a new leaf photo to compare disease progression over time."
         )
 
-    if any(k in q_lower for k in ["rain", "weather", "humidity", "temperature", "climate"]):
+    # 7. Weather / Climate Risk
+    if any(k in q_lower for k in ["rain", "weather", "humidity", "temperature", "climate", "mausam"]):
         risk = "HIGH" if (hum >= 75 or rain > 0) else "MODERATE"
         return (
-            f"{source_prefix}### 🌦️ Microclimate Disease Risk Analysis\n\n"
-            f"Current field readings: **{temp}°C | {hum}% Humidity | {rain} mm/h Rain**.\n\n"
+            f"{source_prefix}### 🌦️ Microclimate Disease Risk Telemetry\n\n"
+            f"Field conditions: **{temp}°C | {hum}% Humidity | {rain} mm/h Rain**.\n\n"
             f"- **Spore Germination Risk**: **{risk}**\n"
-            f"- Pathogen: *{pathogen}*.\n"
-            f"- **Why it matters**: {'Persistent leaf wetness from rain accelerates spore release and germination.' if rain > 0 or hum >= 75 else 'Moderate humidity slows down rapid sporulation.'}\n\n"
-            f"**Action Required**: Do not irrigate using sprinklers or overhead hoses. Water exclusively at the root base."
+            f"- **Analysis**: {'Prolonged humidity and rain create optimal conditions for fungal sporulation and bacterial splash dispersal.' if risk == 'HIGH' else 'Moderate conditions slow pathogen spread. Maintain baseline preventative care.'}\n"
+            f"- **Action**: Keep leaf canopies well-ventilated and avoid working in the field while plants are wet."
         )
 
-    # General diagnosis breakdown
+    # 8. Active Disease Overview (if a scan was performed)
+    if has_active_disease:
+        return (
+            f"{source_prefix}### 🌾 Diagnostic Summary: **{disease}** ({pathogen})\n\n"
+            f"{f'- **Lesion Severity**: {aff_pct:.1f}% affected leaf tissue.' if aff_pct is not None else ''}\n"
+            f"- **Field Conditions**: {temp}°C, {hum}% humidity.\n\n"
+            f"**Recommended Steps**:\n"
+            f"1. **Curative Spray**: {chem}\n"
+            f"2. **Organic Alternative**: {organic}\n"
+            f"3. **Prevention**: {prevention}\n\n"
+            f"Ask me for specific application dosages, rainfall timing, or organic preparation recipes!"
+        )
+
+    # 9. General Agronomic Response
     return (
-        f"{source_prefix}### 🌾 AgroIntelli Agronomic Consultation\n\n"
-        f"**Diagnosed Condition**: **{disease}** (*{pathogen}*)\n"
-        f"{f'- **Lesion Severity**: {aff_pct:.1f}% affected leaf tissue.' if aff_pct is not None else ''}\n"
-        f"- **Field Conditions**: {temp}°C, {hum}% humidity.\n\n"
-        f"**Immediate Actions**:\n"
-        f"1. **Curative Spray**: {chem}\n"
-        f"2. **Organic Alternative**: {organic}\n"
-        f"3. **Preventive Sanitation**: {prevention}\n\n"
-        f"Feel free to ask for specific spray dosage, rain safeguards, or organic recipes!"
+        f"Thank you for reaching out. As your agricultural pathologist, I am here to assist with all aspects of crop health, "
+        f"plant nutrition, irrigation, and pest or disease control.\n\n"
+        f"Feel free to ask a specific question (e.g., *'How to manage early blight in potatoes?'*, *'How often should I water corn?'*), "
+        f"or upload a leaf scan to receive an instant diagnostic breakdown and Grad-CAM lesion analysis."
     )
