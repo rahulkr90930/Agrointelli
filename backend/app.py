@@ -10,9 +10,18 @@ Connects frontend requests to dedicated Python backend modules:
 
 import sys
 import uuid
+import logging
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+
+# Suppress repetitive /health heartbeat log lines in Werkzeug console
+class _HealthFilter(logging.Filter):
+    def filter(self, record):
+        msg = record.getMessage()
+        return "/health" not in msg
+
+logging.getLogger("werkzeug").addFilter(_HealthFilter())
 
 # Reconfigure stdout/stderr to UTF-8 on Windows
 if sys.platform.startswith('win'):

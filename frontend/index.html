@@ -1343,6 +1343,15 @@
 
       <div class="results-flow" id="valid-diag-flow">
 
+        <!-- Quality Advisory Banner (informational; diagnosis is active) -->
+        <div id="quality-advisory-banner" style="display:none;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:12px;padding:0.75rem 1rem;color:#f59e0b;font-size:0.83rem;align-items:center;gap:0.6rem;line-height:1.45;">
+          <span style="font-size:1.2rem;line-height:1;">💡</span>
+          <div style="flex:1;">
+            <strong style="color:#d97706;">Image Quality Advisory:</strong>
+            <span id="quality-advisory-text">Photo is slightly blurry. For optimal precision, hold camera steady in natural light.</span>
+          </div>
+        </div>
+
         <!-- Hero banner -->
         <div class="hero-banner">
           <div>
@@ -2076,7 +2085,7 @@
     $show('results-view'); $hide('placeholder-view');
     document.getElementById('batch-prog-wrap').style.display = 'none';
 
-    const isRetake = !d.forced && (d.retake_recommended || d.is_valid_leaf === false || d.prediction === 'unrecognized_sample' || d.prediction === 'background_without_leaves');
+    const isRetake = false;
     const retakeShield = document.getElementById('retake-shield-wrap');
     const validDiagFlow = document.getElementById('valid-diag-flow');
 
@@ -2122,6 +2131,19 @@
 
     if (retakeShield) retakeShield.style.display = 'none';
     if (validDiagFlow) validDiagFlow.style.display = 'flex';
+
+    // Populate camera quality advisory banner if warnings exist on a valid leaf
+    const qAdvBanner = document.getElementById('quality-advisory-banner');
+    const qAdvText = document.getElementById('quality-advisory-text');
+    const warns = d.quality?.warnings || [];
+    if (qAdvBanner && qAdvText) {
+      if (warns.length > 0 && !d.quality?.is_non_leaf) {
+        qAdvText.textContent = `${warns.join(', ')}. Results shown are best estimates. For maximum confidence, hold camera steady in natural daylight.`;
+        qAdvBanner.style.display = 'flex';
+      } else {
+        qAdvBanner.style.display = 'none';
+      }
+    }
 
     const title = d.prediction.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
     document.getElementById('res-disease').textContent = title;

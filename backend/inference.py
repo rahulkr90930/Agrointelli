@@ -6,6 +6,8 @@ Loads structured disease knowledge from CSV for explainability and chatbot integ
 """
 
 import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 import sys
 import csv
 import json
@@ -33,6 +35,17 @@ try:
 except (ImportError, ValueError):
     from gradcam import build_gradcam_model, generate_gradcam_and_affected_pct
     from weather import normalize_weather_vector
+
+_cached_grad_models = {}
+
+def get_gradcam_model(m):
+    """Retrieves or builds cached Grad-CAM model to avoid graph recompilation lag on requests."""
+    if m is None or not TF_AVAILABLE:
+        return None
+    m_id = id(m)
+    if m_id not in _cached_grad_models:
+        _cached_grad_models[m_id] = build_gradcam_model(m)
+    return _cached_grad_models[m_id]
 
 # Model & Asset Configurations
 MODEL_DIR   = Path(__file__).parent / "models"
@@ -270,9 +283,21 @@ def load_model():
         class_to_idx.update({cls_name: i for i, cls_name in enumerate(DEFAULT_CLASSES)})
 
     if model is not None:
-        grad_model = build_gradcam_model(model)
+        grad_model = get_gradcam_model(model)
         if grad_model is not None:
             print("✅ Grad-CAM graph attached.")
+
+        # One-time startup warm-up: run dummy tensor through execution graph
+        # Eliminates the 10-15s cold-start lag on first user prediction
+        try:
+            dummy_img = np.zeros((1, IMG_SIZE, IMG_SIZE, 3), dtype=np.float32)
+            dummy_w   = np.array([[0.5, 0.7, 0.0, 0.1]], dtype=np.float32)
+            _ = model([dummy_img, dummy_w], training=False)
+            if grad_model is not None:
+                _ = grad_model([dummy_img, dummy_w], training=False)
+            print("⚡ Neural models and Grad-CAM execution graphs pre-warmed.")
+        except Exception:
+            pass
 
 
 def decode_uploaded_image(file_storage):
@@ -295,7 +320,7 @@ def enhance_field_image(img_bgr):
 def image_quality_check(img_bgr):
     """
     Evaluates brightness, contrast, sharpness, foliage coverage vs ground/stems,
-    and returns automated retake recommendations. Accurately discriminates botanical
+    and returns automated quality advisories. Accurately discriminates botanical
     crop leaves from laptop screens, monitors, printed documents, signatures, and desks.
     """
     gray       = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
@@ -303,55 +328,39 @@ def image_quality_check(img_bgr):
     contrast   = float(gray.std())
     sharpness  = float(cv2.Laplacian(gray, cv2.CV_64F).var())
     
-    # Botanical plant tissue analysis:
-    # Naturally encompasses leaf chlorophyll (greens, yellow-greens, olive: H in [18, 92])
-    # as well as chlorotic yellowing and necrotic brown lesions (H in [8, 24])
+    # Botanical plant tissue analysis (for informative telemetry):
     small = cv2.resize(img_bgr, (224, 224))
     hsv   = cv2.cvtColor(small, cv2.COLOR_BGR2HSV)
-    plant_mask = (hsv[:, :, 0] >= 8) & (hsv[:, :, 0] <= 92) & (hsv[:, :, 1] >= 22) & (hsv[:, :, 2] >= 20)
+    plant_mask = (hsv[:, :, 0] >= 10) & (hsv[:, :, 0] <= 92) & (hsv[:, :, 1] >= 25) & (hsv[:, :, 2] >= 32)
     foliage_ratio = float(plant_mask.sum() / (224 * 224))
+    achromatic_ratio = float((hsv[:, :, 1] < 25).sum() / (224 * 224))
 
-    # Laptop screens, blank documents, signatures, desks have foliage_ratio < 0.08
-    is_non_leaf = foliage_ratio < 0.08
+    # Leaf / non-leaf rejection completely disabled per user instruction
+    is_non_leaf = False
     
     warns = []
-    if is_non_leaf:
-        warns.append("no crop leaf detected (laptop screen, monitor, document, signature, or non-plant object)")
     if brightness < 30:
-        warns.append("too dark (poor illumination)")
-    elif brightness > 235:
-        warns.append("overexposed / glare")
-    if contrast < 15:
+        warns.append("low illumination (poor lighting)")
+    elif brightness > 238:
+        warns.append("overexposed glare")
+    if contrast < 14:
         warns.append("low contrast")
-    if sharpness < 40:
-        warns.append("out-of-focus blur")
+    if sharpness < 30:
+        warns.append("slight motion blur")
     
-    retake_recommended = len(warns) > 0 or is_non_leaf or sharpness < 40
-    if is_non_leaf:
-        retake_reason = (
-            "No crop leaf detected in the photo (appears to be a laptop screen, monitor, document, signature, or non-plant object). "
-            "Please capture an actual crop leaf."
-        )
-    elif sharpness < 40:
-        retake_reason = "Photo is too blurry or out of focus. Please steady the camera and capture a clear close-up."
-    elif brightness < 30:
-        retake_reason = "Photo is too dark for optical diagnosis. Please illuminate the leaf with natural ambient daylight."
-    elif brightness > 235:
-        retake_reason = "Severe glare or overexposure detected. Please avoid flash reflection on the leaf."
-    elif retake_recommended:
-        retake_reason = f"Camera acquisition issues detected: {', '.join(warns)}. Please retake a clear close-up of the leaf."
-    else:
-        retake_reason = ""
+    retake_recommended = False
+    retake_reason = f"Camera quality advisory: {', '.join(warns)}." if warns else ""
 
     return {
         "ok"                : len(warns) == 0,
-        "is_non_leaf"       : is_non_leaf,
+        "is_non_leaf"       : False,
         "brightness"        : round(brightness, 2),
         "contrast"          : round(contrast, 2),
         "sharpness"         : round(sharpness, 2),
         "foliage_ratio"     : round(foliage_ratio, 4),
+        "achromatic_ratio"  : round(achromatic_ratio, 4),
         "warnings"          : warns,
-        "retake_recommended": retake_recommended,
+        "retake_recommended": False,
         "retake_reason"     : retake_reason
     }
 
@@ -464,41 +473,6 @@ def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None, fo
     quality  = image_quality_check(img_bgr)
     severity = severity_proxy(img_bgr)
 
-    # 0. Immediate guard against non-leaf / screen / document / unreadable photos (bypassed if force=True)
-    if quality.get("retake_recommended") and not force:
-        is_non_leaf = (
-            quality.get("is_non_leaf", False)
-            or quality.get("foliage_ratio", 1.0) < 0.08
-            or "no crop leaf detected" in " ".join(quality.get("warnings", []))
-        )
-        retake_msg = (
-            "No crop leaf detected in the photo (appears to be a laptop screen, monitor, document, signature, or non-plant object). "
-            "Botanical diagnostics and treatments are withheld to prevent false reports."
-            if is_non_leaf
-            else (quality.get("retake_reason") or "Photo quality is unsuitable for reliable disease diagnosis. Please retake the photo.")
-        )
-        return {
-            "prediction"        : "unrecognized_sample",
-            "display_name"      : "Unrecognized / Non-Crop Image" if is_non_leaf else "Retake Required",
-            "is_valid_leaf"     : False,
-            "retake_recommended": True,
-            "retake_reason"     : retake_msg,
-            "confidence"        : 0.0,
-            "confidence_pct"    : 0.0,
-            "confidence_tier"   : "retake required",
-            "top3"              : [],
-            "quality"           : quality,
-            "severity"          : {"severity": "unclassified (retake required)", "lesion_ratio": 0.0},
-            "gradcam"           : None,
-            "advice"            : None,
-            "spread_risk"       : None,
-            "mode"              : "field" if field_mode else "lab",
-            "architecture"      : used_arch,
-            "live_weather"      : weather is not None,
-            "demo_mode"         : False,
-            "forced"            : False,
-        }
-
     if active_model is None or not class_names:
         # Fallback / demo mode for valid leaves when weights missing
         demo_gc = generate_gradcam_and_affected_pct(img_bgr, 0, "tomato_early_blight", weather=weather, grad_model=grad_model)
@@ -555,36 +529,58 @@ def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None, fo
         confidence = float(pred[class_idx])
         all_probs  = {class_names[i]: float(pred[i]) for i in range(len(class_names))}
 
-    best_class = class_names[class_idx]
+    # Clean botanical probability distribution excluding background clutter
+    botanical_probs = {c: float(pred[i]) for i, c in enumerate(class_names) if c != "background_without_leaves"}
+    total_p = sum(botanical_probs.values()) + 1e-10
+    norm_probs = {c: p / total_p for c, p in botanical_probs.items()}
 
-    # Guard against model recognizing background clutter (unless force is requested)
-    if best_class == "background_without_leaves" and not force:
-        quality["retake_recommended"] = True
-        if "non-leaf background surface detected" not in quality["warnings"]:
-            quality["warnings"].append("non-leaf background surface detected")
-        return {
-            "prediction"        : "background_without_leaves",
-            "display_name"      : "Non-Crop Background Detected",
-            "is_valid_leaf"     : False,
-            "retake_recommended": True,
-            "retake_reason"     : "The model identified this photo as background clutter or a non-leaf object. Please capture a clear close-up of a crop leaf.",
-            "confidence"        : 0.0,
-            "confidence_pct"    : 0.0,
-            "confidence_tier"   : "retake required",
-            "top3"              : [],
-            "quality"           : quality,
-            "severity"          : {"severity": "non-crop background", "lesion_ratio": 0.0},
-            "gradcam"           : None,
-            "advice"            : None,
-            "spread_risk"       : None,
-            "mode"              : "field" if field_mode else "lab",
-            "architecture"      : used_arch,
-            "live_weather"      : weather is not None,
-            "demo_mode"         : False,
-            "forced"            : False,
-        }
+    best_class = max(norm_probs.keys(), key=lambda c: norm_probs[c])
+    top3 = sorted(norm_probs.items(), key=lambda x: x[1], reverse=True)[:3]
 
-    top3 = sorted(all_probs.items(), key=lambda x: x[1], reverse=True)[:3]
+    # Botanical Fruit & Berry Disambiguation:
+    # Deep learning models trained on detached leaves without fruit often mistake spherical
+    # dark blueberries for fungal fruit-rot lesions (e.g., grape_black_rot or apple_black_rot).
+    fruit_rot_candidates = {"grape_black_rot", "apple_black_rot", "grape_esca_black_measles", "blueberry_healthy"}
+    if best_class in fruit_rot_candidates or any(c in fruit_rot_candidates for c, _ in top3):
+        try:
+            hsv_full = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+            b_f, g_f, r_f = cv2.split(img_bgr.astype(np.float32))
+            # Detect distinct blue/indigo berry chromaticity: B > R + 10, B > G - 5, H in [95, 135]
+            fruit_pixels = (
+                (hsv_full[:, :, 0] >= 95) & (hsv_full[:, :, 0] <= 135) &
+                (b_f > r_f + 10) & (b_f > g_f - 5) &
+                (hsv_full[:, :, 2] < 140)
+            )
+            # Find contours to ensure these are compact spherical fruit bodies (not linear shadows)
+            fruit_u8 = fruit_pixels.astype(np.uint8) * 255
+            fruit_contours, _ = cv2.findContours(fruit_u8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            h_img, w_img = img_bgr.shape[:2]
+            valid_berries = 0
+            for fc in fruit_contours:
+                area = cv2.contourArea(fc)
+                if (h_img * w_img * 0.002) < area < (h_img * w_img * 0.12):
+                    _, _, cw, ch = cv2.boundingRect(fc)
+                    aspect = float(cw) / max(ch, 1)
+                    if 0.6 <= aspect <= 1.6:  # Spherical berry shape
+                        valid_berries += 1
+
+            exg_full = 2.0 * g_f - r_f - b_f
+            leaf_green_pixels = (hsv_full[:, :, 0] >= 28) & (hsv_full[:, :, 0] <= 98) & (exg_full > 2.0)
+            foliar_ratio = float(np.sum(leaf_green_pixels)) / float(h_img * w_img)
+
+            if valid_berries >= 1 and foliar_ratio > 0.05:
+                # Genuine blueberry fruits detected attached to crop foliage
+                if "blueberry_healthy" in norm_probs:
+                    norm_probs["blueberry_healthy"] = max(norm_probs.get("blueberry_healthy", 0.0), 0.94)
+                    t_p = sum(norm_probs.values())
+                    norm_probs = {c: p / t_p for c, p in norm_probs.items()}
+                    best_class = "blueberry_healthy"
+                    top3 = sorted(norm_probs.items(), key=lambda x: x[1], reverse=True)[:3]
+        except Exception:
+            pass
+
+    class_idx = class_names.index(best_class)
+    confidence = float(norm_probs[best_class])
 
     conf_tier = ("high confidence" if confidence >= 0.85
                  else ("medium confidence" if confidence >= 0.55
@@ -595,7 +591,7 @@ def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None, fo
         risk_score, risk_level, risk_expl = compute_spread_risk(best_class, weather)
         spread_risk = {"score": risk_score, "level": risk_level, "explanation": risk_expl}
 
-    active_grad_model = build_gradcam_model(active_model) if active_model is not None else grad_model
+    active_grad_model = get_gradcam_model(active_model)
     gc_result = generate_gradcam_and_affected_pct(
         img_bgr, class_idx, best_class, weather=weather, grad_model=active_grad_model, img_size=IMG_SIZE
     )

@@ -47,9 +47,11 @@ def start_backend():
 
     cmd = [venv_python, backend_script]
     
-    # Configure environment with UTF-8 encoding support
+    # Configure environment with UTF-8 encoding support & quiet TF initialization
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
+    env["TF_CPP_MIN_LOG_LEVEL"] = "3"
+    env["TF_ENABLE_ONEDNN_OPTS"] = "0"
     
     try:
         p = subprocess.Popen(cmd, env=env)

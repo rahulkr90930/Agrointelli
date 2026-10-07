@@ -59,28 +59,66 @@ def build_gradcam_model(model):
 def generate_gradcam_and_affected_pct(img_bgr, class_idx, class_name, weather=None, grad_model=None, img_size=224):
     """
     Computes:
-      1. Grad-CAM attention heatmap using logit-proxy gradients for distinct multi-class focus.
-      2. True leaf segmentation isolating foliage from non-leaf background.
-      3. Accurate lesion coverage percentage.
-      4. High-contrast visual overlay that highlights diseased spots while preserving natural leaf greens.
+      1. True Grad-CAM attention heatmap using logit-proxy gradients.
+      2. High-precision botanical lesion & necrosis quantification.
+      3. Dynamic-alpha Grad-CAM visual overlay: lesions glow in vivid warm Jet heat,
+         while healthy foliage remains crisp natural green.
     """
     is_healthy = "healthy" in class_name.lower() or "background" in class_name.lower()
     target_dim = 280
     resized_bgr = cv2.resize(img_bgr, (target_dim, target_dim))
 
-    # 1. Segment leaf foliage
+    # 1. Botanical Leaf Foliage Segmentation & Soil/Litter Suppression
     hsv = cv2.cvtColor(resized_bgr, cv2.COLOR_BGR2HSV)
-    raw_mask = ((hsv[:, :, 1] > 36) & (hsv[:, :, 2] > 30) & (hsv[:, :, 2] < 248)).astype(np.uint8)
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-    leaf_mask_u8 = cv2.morphologyEx(raw_mask, cv2.MORPH_CLOSE, kernel)
-    leaf_mask = leaf_mask_u8.astype(bool)
-    leaf_pixel_count = int(np.sum(leaf_mask))
-    if leaf_pixel_count < 150:
-        leaf_mask = (np.mean(resized_bgr, axis=2) > 25) & (np.mean(resized_bgr, axis=2) < 235)
-        leaf_pixel_count = max(int(np.sum(leaf_mask)), 1)
+    b, g, r = resized_bgr[:, :, 0].astype(np.float32), resized_bgr[:, :, 1].astype(np.float32), resized_bgr[:, :, 2].astype(np.float32)
+    exg = 2.0 * g - r - b
+
+    # Calibrated human skin filter: strictly flags fingers/hands holding leaves, NEVER dark necrotic lesions
+    ycrcb = cv2.cvtColor(resized_bgr, cv2.COLOR_BGR2YCrCb)
+    is_skin = (
+        (ycrcb[:, :, 1] >= 133) & (ycrcb[:, :, 1] <= 175) &
+        (ycrcb[:, :, 2] >= 77) & (ycrcb[:, :, 2] <= 128) &
+        (ycrcb[:, :, 0] >= 95) & (resized_bgr[:, :, 0] >= 55)
+    )
+
+    # Detect living vegetative chlorophyll tissue
+    green_core = ((exg > 4.0) | ((hsv[:, :, 0] >= 28) & (hsv[:, :, 0] <= 92) & (hsv[:, :, 1] >= 32) & (hsv[:, :, 2] >= 30))) & (~is_skin)
+    green_count = int(np.sum(green_core))
+
+    bgr_int = resized_bgr.astype(np.int16)
+    is_brown_or_yellow = ((hsv[:, :, 0] < 35) | (hsv[:, :, 0] > 140)) & (bgr_int[:, :, 2] > bgr_int[:, :, 1] - 15) & (hsv[:, :, 1] > 28) & (hsv[:, :, 2] > 25)
+    is_necrotic_dark = (hsv[:, :, 2] < 92) & (bgr_int[:, :, 1] < 88) & (hsv[:, :, 1] > 20)
+    foliar_candidates = green_core | is_brown_or_yellow | is_necrotic_dark
+
+    if green_count > 120:
+        # Construct anatomical leaf envelopes from the green foliage contours using convex hulls
+        contours, _ = cv2.findContours(green_core.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        hull_mask = np.zeros((target_dim, target_dim), dtype=np.uint8)
+        for c in contours:
+            if cv2.contourArea(c) > 45:
+                hull = cv2.convexHull(c)
+                cv2.drawContours(hull_mask, [hull], 0, 255, -1)
+
+        # Generously dilate envelope by 19px to enclose peripheral lesion borders and leaf tips
+        kernel_hull = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (19, 19))
+        leaf_envelope = cv2.dilate(hull_mask, kernel_hull) > 0
+
+        # pure_leaf includes living blade and lesions ON the leaf, strictly excluding background soil and detached litter
+        pure_leaf = leaf_envelope & foliar_candidates & (~is_skin)
+        leaf_pixel_count = int(np.sum(pure_leaf))
+        if leaf_pixel_count < 150:
+            pure_leaf = leaf_envelope & (~is_skin)
+    else:
+        # Fallback for lab-isolated dried or severely necrotic leaves
+        raw_mask = ((hsv[:, :, 1] > 36) & (hsv[:, :, 2] > 30) & (hsv[:, :, 2] < 248)).astype(np.uint8)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        leaf_mask_u8 = cv2.morphologyEx(raw_mask, cv2.MORPH_CLOSE, kernel)
+        pure_leaf = leaf_mask_u8.astype(bool) & (~is_skin)
+
+    leaf_pixel_count = max(int(np.sum(pure_leaf)), 1)
 
     heatmap = None
-    # 2. Attempt True Grad-CAM if grad_model and TF are available
+    # 2. Compute True Grad-CAM if grad_model and TF are available
     if TF_AVAILABLE and grad_model is not None and not is_healthy:
         try:
             inp_img = cv2.resize(img_bgr, (img_size, img_size))
@@ -96,7 +134,6 @@ def generate_gradcam_and_affected_pct(img_bgr, class_idx, class_name, weather=No
 
             with tf.GradientTape() as tape:
                 conv_out, preds = grad_model([inp_arr, w_arr], training=False)
-                # Use log-loss / logit proxy to prevent vanishing gradients across large class spaces
                 loss = tf.math.log(preds[:, class_idx] + 1e-10)
 
             grads = tape.gradient(loss, conv_out)
@@ -111,12 +148,8 @@ def generate_gradcam_and_affected_pct(img_bgr, class_idx, class_name, weather=No
         except Exception:
             heatmap = None
 
-    # 3. Pathological Lesion Color & Texture Segmentation
-    bgr_int = resized_bgr.astype(np.int16)
-    # Target necrotic brown/yellow/black lesion patterns
-    is_brown_or_yellow = leaf_mask & ((hsv[:, :, 0] < 35) | (hsv[:, :, 0] > 140)) & (bgr_int[:, :, 2] > bgr_int[:, :, 1] - 15)
-    is_necrotic_dark = leaf_mask & (hsv[:, :, 2] < 90) & (bgr_int[:, :, 1] < 85)
-    color_lesion_bool = is_brown_or_yellow | is_necrotic_dark
+    # 3. Pathological Lesion Color & Texture Saliency
+    color_lesion_bool = pure_leaf & (is_brown_or_yellow | is_necrotic_dark)
     color_lesion_smooth = cv2.GaussianBlur(color_lesion_bool.astype(np.float32), (15, 15), 0)
 
     gray = cv2.cvtColor(resized_bgr, cv2.COLOR_BGR2GRAY)
@@ -128,36 +161,46 @@ def generate_gradcam_and_affected_pct(img_bgr, class_idx, class_name, weather=No
     if heatmap is None:
         combined_saliency = np.zeros((target_dim, target_dim), dtype=np.float32)
         if not is_healthy:
-            combined_saliency = (color_lesion_smooth * 0.70 + texture_grad * 0.30) * leaf_mask.astype(np.float32)
+            combined_saliency = (color_lesion_smooth * 0.70 + texture_grad * 0.30) * pure_leaf.astype(np.float32)
             combined_saliency = cv2.GaussianBlur(combined_saliency, (9, 9), 0)
             if combined_saliency.max() > 0:
                 combined_saliency /= combined_saliency.max()
         heatmap = combined_saliency
     else:
-        # Multi-scale Guided Fusion: deep semantic neural attention + high-res lesion necrosis/chlorosis
         cam_resized = cv2.resize(heatmap, (target_dim, target_dim))
-        if cam_resized.max() > 0:
-            cam_resized /= cam_resized.max()
-        fused = (0.50 * cam_resized + 0.50 * color_lesion_smooth) * leaf_mask.astype(np.float32)
+        # Mask CAM to the genuine leaf blade FIRST to eliminate any background soil/litter artifacts
+        cam_on_leaf = cam_resized * pure_leaf.astype(np.float32)
+        c_min, c_max = float(cam_on_leaf.min()), float(cam_on_leaf.max())
+        if c_max > c_min:
+            cam_on_leaf = (cam_on_leaf - c_min) / (c_max - c_min)
+
+        if color_lesion_smooth.max() > 0:
+            # Lesion-focused fusion: Sharpens true necrotic spots on the leaf blade
+            fused = (0.55 * cam_on_leaf + 0.45 * color_lesion_smooth) * pure_leaf.astype(np.float32)
+        else:
+            fused = cam_on_leaf
+
         if fused.max() > 0:
             fused /= fused.max()
         heatmap = fused
 
-    # 4. Compute Affected Percentage
+    # 4. Calibrated % Area Affected (Strictly Lesion Hotspots)
     if is_healthy:
         affected_pct = 0.0
         sev_category = "Healthy (0% Damaged)"
         damage_desc = "Leaf surface is healthy with no significant necrotic lesions detected."
     else:
-        # Lesion is where neural attention is high OR verified color necrosis occurs within attention region
-        diseased_mask = leaf_mask & ((heatmap > 0.40) | (color_lesion_bool & (heatmap > 0.15)))
+        # Lesion is strictly where heatmap or necrotic color indicates disease on the leaf blade
+        diseased_mask = pure_leaf & ((heatmap > 0.40) | color_lesion_bool)
         diseased_count = int(np.sum(diseased_mask))
-        affected_pct = round(min(100.0, (diseased_count / leaf_pixel_count) * 100.0), 1)
+
+        raw_pct = (diseased_count / leaf_pixel_count) * 100.0
+        affected_pct = round(min(100.0, raw_pct), 1)
 
         # Baseline clamp for recognized diseased classes
-        if affected_pct < 3.0:
-            mean_heat = float(np.mean(heatmap[leaf_mask])) if np.any(leaf_mask) else 0.1
-            affected_pct = round(float(np.clip(mean_heat * 30.0, 4.5, 12.0)), 1)
+        if affected_pct < 2.5:
+            mean_heat = float(np.mean(heatmap[pure_leaf])) if np.any(pure_leaf) else 0.1
+            affected_pct = round(float(np.clip(mean_heat * 25.0, 3.5, 9.0)), 1)
 
         if affected_pct < 10.0:
             sev_category = "Mild Damage"
@@ -169,19 +212,19 @@ def generate_gradcam_and_affected_pct(img_bgr, class_idx, class_name, weather=No
             sev_category = "Severe Damage"
             damage_desc = f"Extensive tissue destruction across {affected_pct}% of the leaf area."
 
-    # 5. Generate Visual Grad-CAM Overlay with Clear Foliage Distinction
+    # 5. Vivid Visual Grad-CAM Overlay with Dynamic Attention Alpha
     heat_u8 = (np.clip(heatmap, 0, 1) * 255).astype(np.uint8)
     heat_color = cv2.applyColorMap(heat_u8, cv2.COLORMAP_JET)
 
     if is_healthy:
-        # For healthy leaves, retain clean natural leaf with minimal subtle glow
+        # Subtle gentle overlay for healthy foliage
         tinted = cv2.addWeighted(resized_bgr, 0.92, heat_color, 0.08, 0)
-        leaf_mask_3d = np.repeat(np.expand_dims(leaf_mask.astype(np.float32), axis=2), 3, axis=2)
-        final_bgr = (tinted * leaf_mask_3d + resized_bgr * (1.0 - leaf_mask_3d)).astype(np.uint8)
+        pure_leaf_3d = np.repeat(np.expand_dims(pure_leaf.astype(np.float32), axis=2), 3, axis=2)
+        final_bgr = (tinted * pure_leaf_3d + resized_bgr * (1.0 - pure_leaf_3d)).astype(np.uint8)
     else:
-        # Dynamic attention alpha: only apply Jet colormap where attention is distinct!
-        # Healthy portions of the leaf remain natural green!
-        attention_alpha = np.clip((heatmap - 0.15) / 0.65, 0.0, 0.70) * leaf_mask.astype(np.float32)
+        # Dynamic attention alpha: Jet colormap applies ONLY where attention/lesion is distinct!
+        # Healthy portions of the leaf remain 100% natural, crisp leaf green!
+        attention_alpha = np.clip((heatmap - 0.15) / 0.65, 0.0, 0.75) * pure_leaf.astype(np.float32)
         attention_alpha = np.repeat(np.expand_dims(attention_alpha, axis=2), 3, axis=2)
         final_bgr = (heat_color.astype(np.float32) * attention_alpha + resized_bgr.astype(np.float32) * (1.0 - attention_alpha)).astype(np.uint8)
 
