@@ -76,7 +76,9 @@ def home():
     frontend_file = frontend_dir / "index.html"
     if frontend_file.exists():
         from flask import send_file
-        return send_file(str(frontend_file))
+        response = send_file(str(frontend_file))
+        response.headers["Cache-Control"] = "no-store"
+        return response
     return jsonify({"error": "frontend/index.html not found"}), 404
 
 
@@ -84,7 +86,9 @@ def home():
 def web_app():
     frontend_file = frontend_dir / "index.html"
     from flask import send_file
-    return send_file(str(frontend_file))
+    response = send_file(str(frontend_file))
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.route("/styles.css", methods=["GET"])
@@ -101,7 +105,9 @@ def serve_app_js():
     js_file = frontend_dir / "app.js"
     if js_file.exists():
         from flask import send_file
-        return send_file(str(js_file), mimetype="application/javascript")
+        response = send_file(str(js_file), mimetype="application/javascript")
+        response.headers["Cache-Control"] = "no-store"
+        return response
     return "", 404
 
 
