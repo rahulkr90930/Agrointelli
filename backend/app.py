@@ -1033,9 +1033,11 @@ def recheck_leaf(record_id):
         (baseline_entry or {}).get("prediction")
         or rec.get("initial_prediction")
     )
-    crop_filter = normalize_plant_tag(
-        baseline_prediction or rec.get("plant_name", "")
-    )
+    crop_filter = normalize_plant_tag(rec.get("plant_name", ""))
+    if not crop_filter or not any(
+        class_name.startswith(f"{crop_filter}_") for class_name in class_names
+    ):
+        crop_filter = normalize_plant_tag(baseline_prediction)
     if crop_filter and not any(
         class_name.startswith(f"{crop_filter}_") for class_name in class_names
     ):

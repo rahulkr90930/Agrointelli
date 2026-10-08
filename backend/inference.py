@@ -632,6 +632,23 @@ def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None, fo
         except Exception:
             pass
 
+    if clean_plant_filter:
+        crop_probabilities = {
+            class_name: probability
+            for class_name, probability in norm_probs.items()
+            if class_name.startswith(f"{clean_plant_filter}_")
+        }
+        if not crop_probabilities:
+            raise ValueError(
+                f"No diagnostic classes are available for the selected crop: {clean_plant_filter}."
+            )
+        best_class = max(crop_probabilities, key=crop_probabilities.get)
+        top3 = sorted(
+            crop_probabilities.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )[:3]
+
     class_idx = class_names.index(best_class)
     confidence = float(norm_probs[best_class])
 
