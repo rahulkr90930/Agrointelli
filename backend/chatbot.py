@@ -150,7 +150,11 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
     weather = scan_ctx.get("weather", {})
     knowledge = scan_ctx.get("knowledge_record")
     gradcam_data = scan_ctx.get("gradcam", {})
-    aff_pct = gradcam_data.get("affected_pct") if isinstance(gradcam_data, dict) else None
+    aff_pct = (
+        gradcam_data.get("affected_pct", scan_ctx.get("affected_pct"))
+        if isinstance(gradcam_data, dict)
+        else scan_ctx.get("affected_pct")
+    )
     plant_name = scan_ctx.get("plant_name", "")
     mongo_summary = scan_ctx.get("mongo_history_summary", "")
     is_historical = scan_ctx.get("is_historical", False)
@@ -171,7 +175,18 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
             if knowledge:
                 k_sum = f"Pathogen: {knowledge.get('pathogen', 'N/A')}\nChemical: {knowledge.get('treatment_protocol', 'N/A')}\nOrganic: {knowledge.get('organic_remedies', 'N/A')}\nPrevention: {knowledge.get('prevention', 'N/A')}"
 
-            prompt = f"{SYSTEM_PROMPT}\n\n[CONTEXT]\n- Scan: {pred if has_scan else 'None'}\n- Weather: {weather_desc}\n{k_sum}\n\n[USER QUESTION]\n{user_message}\n\n[TARGET LANGUAGE]: {language}"
+            prompt = (
+                f"{SYSTEM_PROMPT}\n\n[CONTEXT]\n"
+                f"- Scan: {pred if has_scan else 'None'}\n"
+                f"- Crop: {plant_name or 'Not identified'}\n"
+                f"- Confidence: {scan_ctx.get('confidence_pct', 'N/A')}%\n"
+                f"- Estimated affected leaf area: {aff_pct if aff_pct is not None else 'N/A'}%\n"
+                f"- Weather: {weather_desc}\n{k_sum}\n\n"
+                f"[USER QUESTION]\n{user_message}\n\n"
+                f"Answer this question directly in 2-5 concise sentences. Mention scan measurements only when relevant. "
+                f"Do not use markdown heading markers (#). Avoid generic advice and do not invent values.\n"
+                f"[TARGET LANGUAGE]: {language}"
+            )
             cand = _gemini_client.GenerativeModel("models/gemini-2.0-flash", generation_config=FAST_GEN_CONFIG)
             res = cand.generate_content(prompt, request_options={"timeout": 4.0})
             if res and res.text:
@@ -182,7 +197,8 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
     # Instant, deeply-grounded localized agronomic expert
     reply = _build_local_grounded_reply(
         user_message, pred, aff_pct, weather, knowledge,
-        language=language, is_historical=is_historical, plant_name=plant_name, mongo_summary=mongo_summary
+        language=language, is_historical=is_historical, plant_name=plant_name,
+        mongo_summary=mongo_summary, confidence_pct=conf
     )
     return {
         "reply": reply,
@@ -191,7 +207,7 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
     }
 
 
-def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, language="English", is_historical=False, plant_name="", mongo_summary=""):
+def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, language="English", is_historical=False, plant_name="", mongo_summary="", confidence_pct=0):
     """
     Instant, conversational, comprehensive agronomic response engine.
     Extracts disease information from knowledge base, provides exact dosages,
@@ -271,7 +287,7 @@ def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, langua
         hum_min = knowledge.get("humidity_min", "70")
 
         # Specific: Treatment & Chemical Sprays
-        if any(k in q_low for k in ["treatment", "cure", "spray", "chemical", "medicine", "dawa", "fungicide", "pesticide", "how to treat"]):
+        if any(k in q_low for k in ["treatment", "cure", "spray", "chemical", "medicine", "dawa", "fungicide", "pesticide", "how to treat", "chikitsa"]):
             if language == "Hindi":
                 return (
                     f"### 💊 **{d_name} ({crop})** का प्रभावी उपचार प्रोटोकॉल\n\n"
@@ -282,6 +298,18 @@ def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, langua
                     f"2. **जैविक विकल्प (Organic Remedy)**:\n"
                     f"   - {org}\n"
                     f"3. **रोकथाम और प्रबंधन**:\n"
+                    f"   - {prev}"
+                )
+            elif language == "Bengali":
+                return (
+                    f"### 💊 **{d_name} ({crop})** এর সঠিক প্রতিকার নির্দেশিকা\n\n"
+                    f"**জীবাণু (Pathogen)**: *{pathogen}*\n\n"
+                    f"1. **রাসায়নিক ছত্রাকনাশক (Chemical Spray)**:\n"
+                    f"   - {chem}\n"
+                    f"   - **স্প্রে করার সময়**: সকালে কড়া রোদ ওঠার আগে অথবা বিকেলে স্প্রে করুন।\n"
+                    f"2. **জৈব সমাধান (Organic Remedy)**:\n"
+                    f"   - {org}\n"
+                    f"3. **প্রতিরোধ ও পরিচর্যা**:\n"
                     f"   - {prev}"
                 )
             return (
@@ -305,6 +333,13 @@ def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, langua
                     f"2. **जैविक उपचार**: {org}\n"
                     f"3. **स्वच्छता**: संक्रमित पत्तियों को तोड़कर खेत से दूर नष्ट कर दें।"
                 )
+            elif language == "Bengali":
+                return (
+                    f"### 🌿 **{d_name}** এর প্রাকৃতিক ও জৈব প্রতিকার\n\n"
+                    f"1. **নিম তেলের স্প্রে**: ১ লিটার জলে ৫ মিলি খাঁটি কোল্ড-প্রেসড নিম তেল ও ১ মিলি হালকা তরল সাবান মিশিয়ে প্রতি ৫-৭ দিন অন্তর পাতার উভয় পিঠে স্প্রে করুন।\n"
+                    f"2. **জৈব নিয়ন্ত্রণ**: {org}\n"
+                    f"3. **পরিচ্ছন্নতা**: আক্রান্ত পাতা তুলে পুড়িয়ে বা মাটি চাপা দিয়ে ধ্বংস করুন।"
+                )
             return (
                 f"### 🌿 Organic & Biological Solutions for **{d_name}**\n\n"
                 f"1. **Cold-Pressed Neem Oil Spray**: Mix 5 ml pure neem oil (10,000 ppm Azadirachtin) + 1 ml mild dish soap in 1 liter of lukewarm water. Spray thoroughly over upper and lower leaf surfaces every 5–7 days.\n"
@@ -322,6 +357,15 @@ def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, langua
                     f"- **संकेत**: पत्तियों पर भूरे/काले धब्बे, पीलापन और ऊतकों का सूखना।\n\n"
                     f"**उपचार**: {chem}\n"
                     f"**जैविक उपाय**: {org}"
+                )
+            elif language == "Bengali":
+                return (
+                    f"### 🔍 **{d_name}** এর লক্ষণ ও কারণ\n\n"
+                    f"- **জীবাণু**: *{pathogen}*\n"
+                    f"- **অনুকূল আবহাওয়া**: তাপমাত্রা **{temp_min}°C থেকে {temp_max}°C** এবং **{hum_min}% এর বেশি আর্দ্রতায়** রোগ দ্রুত ছড়ায়।\n"
+                    f"- **লক্ষণ**: পাতায় বাদামী বা কালো দাগ, হলদে ভাব ও শুকিয়ে যাওয়া।\n\n"
+                    f"**রাসায়নিক ব্যবস্থা**: {chem}\n"
+                    f"**জৈব ব্যবস্থা**: {org}"
                 )
             return (
                 f"### 🔍 Pathology & Symptom Breakdown for **{d_name}**\n\n"
@@ -343,16 +387,26 @@ def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, langua
                 f"- **जैविक उपचार**: {org}\n"
                 f"- **बचाव**: {prev}"
             )
+        elif language == "Bengali":
+            return (
+                f"### 📋 **{d_name}** ({crop}) এর বিস্তারিত রিপোর্ট\n\n"
+                f"- **জীবাণু**: *{pathogen}*\n"
+                f"- **প্রতিকার ও স্প্রে**: {chem}\n"
+                f"- **জৈব সমাধান**: {org}\n"
+                f"- **প্রতিরোধ**: {prev}"
+            )
         return (
-            f"### 📋 Comprehensive Agronomic Profile for **{d_name}** ({crop})\n\n"
-            f"- **Pathogen Classification**: *{pathogen}*\n"
-            f"- **Favorable Conditions**: {temp_min}–{temp_max}°C with relative humidity above {hum_min}%\n\n"
-            f"#### 1. Treatment & Sprays:\n"
-            f"{chem}\n\n"
-            f"#### 2. Biological & Organic Remedies:\n"
-            f"{org}\n\n"
-            f"#### 3. Field Sanitation & Prevention:\n"
-            f"{prev}"
+            f"{crop} scan: {d_name} is associated with {pathogen}. "
+            f"The affected area is {aff_pct}%"
+            f"{f' at {confidence_pct}% model confidence' if confidence_pct else ''}.\n\n"
+            f"First action: {chem}\n"
+            f"Prevention: {prev}\n"
+            f"Organic option: {org}"
+            if aff_pct is not None
+            else (
+                f"{crop}: {d_name} is associated with {pathogen}. "
+                f"Treatment: {chem} Prevention: {prev} Organic option: {org}"
+            )
         )
 
     # General agronomy inquiry fallback
@@ -361,6 +415,12 @@ def _build_local_grounded_reply(query, pred, aff_pct, weather, knowledge, langua
             "धन्यवाद! मैं आपका डिजिटल फसल सलाहकार हूँ। "
             "आप किसी भी फसल रोग (जैसे *'टमाटर अगेती झुलसा का इलाज क्या है?'*), कवकनाशी स्प्रे, या जैविक नीम तेल उपचार के बारे में सवाल पूछ सकते हैं "
             "या पत्ती की फोटो अपलोड करके तुरंत जांच करवा सकते हैं।"
+        )
+    elif language == "Bengali":
+        return (
+            "ধন্যবাদ! আমি আপনার কৃষি সহায়ক এআই। "
+            "আপনি যেকোনো ফসলের রোগ (যেমন *'টমেটোর আর্লি ব্লাইটের চিকিৎসা কী?'*), ছত্রাকনাশক স্প্রে বা জৈব নিম তেলের প্রতিকার সম্পর্কে প্রশ্ন করতে পারেন "
+            "অথবা পাতার ছবি আপলোড করে তাৎক্ষণিক রোগ নির্ণয় করতে পারেন।"
         )
     return (
         "Thank you for reaching out! As your precision agricultural pathologist, I can assist with any crop disease, "

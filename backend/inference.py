@@ -449,8 +449,46 @@ def compute_spread_risk(disease_label, weather):
     return round(score, 3), level, explanation
 
 
-def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None, force=False):
-    """Run the full prediction pipeline and return a structured result dict. Supports force=True to bypass quality filters."""
+def normalize_plant_tag(raw_plant):
+    """Normalize plant alias so user selection strictly maps to candidate classes."""
+    if not raw_plant:
+        return None
+    p = str(raw_plant).strip().lower().replace(" ", "_").replace("-", "_")
+    if p in ("", "all", "all_plants", "none", "auto", "auto_detect", "optional", "select_crop"):
+        return None
+    if "tomato" in p:
+        return "tomato"
+    if "potato" in p:
+        return "potato"
+    if "corn" in p or "maize" in p:
+        return "corn"
+    if "pepper" in p or "bell" in p:
+        return "pepper"
+    if "apple" in p:
+        return "apple"
+    if "grape" in p:
+        return "grape"
+    if "cherry" in p:
+        return "cherry"
+    if "strawberry" in p:
+        return "strawberry"
+    if "peach" in p:
+        return "peach"
+    if "orange" in p or "citrus" in p:
+        return "orange"
+    if "blueberry" in p:
+        return "blueberry"
+    if "soybean" in p or "soy" in p:
+        return "soybean"
+    if "squash" in p:
+        return "squash"
+    if "raspberry" in p:
+        return "raspberry"
+    return p
+
+
+def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None, force=False, plant=None):
+    """Run the full prediction pipeline and return a structured result dict. Supports force=True to bypass quality filters and plant to condition classes."""
     active_model = model
     used_arch = "mobilenet_v3"
 
@@ -473,11 +511,19 @@ def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None, fo
     quality  = image_quality_check(img_bgr)
     severity = severity_proxy(img_bgr)
 
+    clean_plant_filter = normalize_plant_tag(plant)
+
     if active_model is None or not class_names:
         # Fallback / demo mode for valid leaves when weights missing
-        demo_gc = generate_gradcam_and_affected_pct(img_bgr, 0, "tomato_early_blight", weather=weather, grad_model=grad_model)
+        demo_pred = "tomato_early_blight"
+        if clean_plant_filter:
+            matching = [c for c in (class_names or DEFAULT_CLASSES) if c.startswith(f"{clean_plant_filter}_")]
+            if matching:
+                demo_pred = matching[0]
+        demo_gc = generate_gradcam_and_affected_pct(img_bgr, 0, demo_pred, weather=weather, grad_model=grad_model)
         return {
-            "prediction"        : "tomato_early_blight",
+            "prediction"        : demo_pred,
+            "plant"             : (demo_pred.split('_')[0] if '_' in demo_pred else (clean_plant_filter or "Tomato")).capitalize(),
             "confidence"        : 0.87,
             "confidence_pct"    : 87.0,
             "confidence_tier"   : "high confidence",
@@ -485,14 +531,12 @@ def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None, fo
             "retake_recommended": False,
             "forced"            : force,
             "top3"              : [
-                ["tomato_early_blight", 0.87],
-                ["tomato_late_blight",  0.08],
-                ["tomato_healthy",      0.03],
+                [demo_pred, 0.87],
             ],
             "quality"           : quality,
             "severity"          : severity,
             "gradcam"           : demo_gc,
-            "advice"            : get_care_advice("tomato_early_blight"),
+            "advice"            : get_care_advice(demo_pred),
             "spread_risk"       : None,
             "mode"              : "field" if field_mode else "lab",
             "architecture"      : used_arch,
@@ -531,6 +575,13 @@ def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None, fo
 
     # Clean botanical probability distribution excluding background clutter
     botanical_probs = {c: float(pred[i]) for i, c in enumerate(class_names) if c != "background_without_leaves"}
+
+    # Plant-conditioned inference: When user specifies a plant (e.g. Tomato), strictly evaluate only that plant's disease classes
+    if clean_plant_filter:
+        plant_candidates = [c for c in botanical_probs.keys() if c.startswith(f"{clean_plant_filter}_")]
+        if plant_candidates:
+            botanical_probs = {c: botanical_probs[c] for c in plant_candidates}
+
     total_p = sum(botanical_probs.values()) + 1e-10
     norm_probs = {c: p / total_p for c, p in botanical_probs.items()}
 
@@ -596,8 +647,11 @@ def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None, fo
         img_bgr, class_idx, best_class, weather=weather, grad_model=active_grad_model, img_size=IMG_SIZE
     )
 
+    detected_plant = best_class.split('_')[0].capitalize() if '_' in best_class else (plant or "Tomato")
+
     return {
         "prediction"        : best_class,
+        "plant"             : detected_plant,
         "is_valid_leaf"     : True,
         "retake_recommended": False,
         "forced"            : force,
@@ -617,8 +671,8 @@ def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None, fo
     }
 
 
-def predict_with_context(img_bgr, field_mode=True, weather=None, model_choice=None, force=False):
+def predict_with_context(img_bgr, field_mode=True, weather=None, model_choice=None, force=False, plant=None):
     """Run one prediction and enrich it with trend-friendly fields."""
-    result = run_prediction(img_bgr, field_mode=field_mode, weather=weather, model_choice=model_choice, force=force)
+    result = run_prediction(img_bgr, field_mode=field_mode, weather=weather, model_choice=model_choice, force=force, plant=plant)
     result["severity_score"] = severity_numeric(result.get("severity", {}))
     return result

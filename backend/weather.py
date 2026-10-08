@@ -39,9 +39,35 @@ def normalize_weather_vector(weather_dict):
     return [temp_norm, hum_norm, rain_norm, wind_norm]
 
 
-def fetch_live_weather_snapshot(lat=None, lon=None):
+def fetch_live_weather_snapshot(lat=None, lon=None, city=None):
     """Fetch live weather using HTTPS OpenWeatherMap API with automatic Open-Meteo zero-key fallback."""
-    city, country = "Local Field", "IN"
+    # 1. Direct city query if provided
+    if city and str(city).strip():
+        clean_city = str(city).strip()
+        try:
+            url = f"https://api.openweathermap.org/data/2.5/weather?q={clean_city}&appid={OWM_API_KEY}&units=metric"
+            w_resp = requests.get(url, timeout=6)
+            if w_resp.status_code == 200:
+                w_data = w_resp.json()
+                if w_data.get("cod") == 200:
+                    return {
+                        "success": True,
+                        "weather": {
+                            "city": w_data.get("name", clean_city),
+                            "country": w_data.get("sys", {}).get("country", ""),
+                            "temp_c": round(w_data["main"]["temp"], 1),
+                            "feels_like_c": round(w_data["main"]["feels_like"], 1),
+                            "humidity_pct": int(w_data["main"]["humidity"]),
+                            "condition": w_data["weather"][0]["description"],
+                            "wind_kmh": round(w_data["wind"]["speed"] * 3.6, 1),
+                            "rain_1h_mm": float(w_data.get("rain", {}).get("1h", 0.0) or 0.0),
+                            "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        },
+                    }
+        except Exception as e:
+            print(f"City query notice for {clean_city}: {e}")
+
+    loc_city, country = None, "IN"
     if lat is None or lon is None:
         try:
             resp = requests.get("https://ipapi.co/json/", timeout=4)
@@ -49,7 +75,7 @@ def fetch_live_weather_snapshot(lat=None, lon=None):
                 loc_data = resp.json()
                 lat = loc_data.get("latitude", 22.57)
                 lon = loc_data.get("longitude", 88.36)
-                city = loc_data.get("city", "Local Field")
+                loc_city = loc_data.get("city")
                 country = loc_data.get("country_code", "IN")
             else:
                 raise ValueError("ipapi failed")
@@ -58,12 +84,12 @@ def fetch_live_weather_snapshot(lat=None, lon=None):
                 loc_data = requests.get("http://ip-api.com/json/", timeout=4).json()
                 lat = loc_data.get("lat", 22.57)
                 lon = loc_data.get("lon", 88.36)
-                city = loc_data.get("city", "Local Field")
+                loc_city = loc_data.get("city")
                 country = loc_data.get("country", "IN")
             except Exception:
                 lat, lon = 22.57, 88.36
 
-    # 1. Try OpenWeatherMap HTTPS
+    # 2. Try OpenWeatherMap HTTPS by coordinates
     try:
         url = (
             f"https://api.openweathermap.org/data/2.5/weather"
@@ -72,24 +98,25 @@ def fetch_live_weather_snapshot(lat=None, lon=None):
         w_resp = requests.get(url, timeout=6)
         w_data = w_resp.json()
         if w_resp.status_code == 200 and w_data.get("cod") == 200:
+            resolved_city = w_data.get("name") or loc_city or "Field Station"
             return {
                 "success": True,
                 "weather": {
-                    "city": city or w_data.get("name", "Field Station"),
-                    "country": country or w_data.get("sys", {}).get("country", ""),
-                    "temp_c": w_data["main"]["temp"],
-                    "feels_like_c": w_data["main"]["feels_like"],
-                    "humidity_pct": w_data["main"]["humidity"],
+                    "city": resolved_city,
+                    "country": w_data.get("sys", {}).get("country", country),
+                    "temp_c": round(w_data["main"]["temp"], 1),
+                    "feels_like_c": round(w_data["main"]["feels_like"], 1),
+                    "humidity_pct": int(w_data["main"]["humidity"]),
                     "condition": w_data["weather"][0]["description"],
                     "wind_kmh": round(w_data["wind"]["speed"] * 3.6, 1),
-                    "rain_1h_mm": w_data.get("rain", {}).get("1h", 0.0),
+                    "rain_1h_mm": float(w_data.get("rain", {}).get("1h", 0.0) or 0.0),
                     "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
                 },
             }
     except Exception as e:
         print(f"OpenWeatherMap API notice: {e}")
 
-    # 2. Try Open-Meteo free HTTPS API (No API key needed)
+    # 3. Try Open-Meteo free HTTPS API (No API key needed)
     try:
         om_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&hourly=relative_humidity_2m,precipitation"
         om_resp = requests.get(om_url, timeout=6)
@@ -98,7 +125,6 @@ def fetch_live_weather_snapshot(lat=None, lon=None):
             cw = om_data.get("current_weather", {})
             temp = cw.get("temperature", 25.0)
             wind = round(cw.get("windspeed", 10.0), 1)
-            # Estimate humidity from hourly
             hourly_hum = om_data.get("hourly", {}).get("relative_humidity_2m", [70])
             hum = hourly_hum[0] if hourly_hum else 70
             hourly_precip = om_data.get("hourly", {}).get("precipitation", [0.0])
@@ -107,25 +133,25 @@ def fetch_live_weather_snapshot(lat=None, lon=None):
             return {
                 "success": True,
                 "weather": {
-                    "city": city,
+                    "city": loc_city or "Field Station",
                     "country": country,
-                    "temp_c": temp,
-                    "feels_like_c": temp,
-                    "humidity_pct": hum,
+                    "temp_c": round(temp, 1),
+                    "feels_like_c": round(temp, 1),
+                    "humidity_pct": int(hum),
                     "condition": "live satellite microclimate",
                     "wind_kmh": wind,
-                    "rain_1h_mm": rain,
+                    "rain_1h_mm": float(rain),
                     "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
                 },
             }
     except Exception as e:
         print(f"Open-Meteo fallback notice: {e}")
 
-    # 3. Default robust fallback
+    # 4. Default robust fallback
     return {
         "success": False,
         "weather": {
-            "city": city,
+            "city": loc_city or "Field Station",
             "country": country,
             "temp_c": 28.0,
             "feels_like_c": 30.0,

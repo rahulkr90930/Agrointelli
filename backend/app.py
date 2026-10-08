@@ -58,22 +58,22 @@ except (ImportError, ValueError):
     )
     from batch import batch_progress_summary, normalize_labels
 
-app = Flask(__name__)
+frontend_dir = Path(__file__).parent.parent / "frontend"
+app = Flask(__name__, static_folder=str(frontend_dir), static_url_path="")
 CORS(app)
 
 # Initialize neural models and label mappings on startup
 load_model()
 
 
-# ── Root & System Endpoints ───────────────────────────────────────────────────
+# ── Root & Static Endpoints ───────────────────────────────────────────────────
 
 @app.route("/", methods=["GET"])
 def home():
     """
     Root route: Unconditionally serves the interactive AgroIntelli Web Application.
-    Guarantees that Local, GitHub Codespaces, Replit, Binder, and Docker always load the UI directly.
     """
-    frontend_file = Path(__file__).parent.parent / "frontend" / "index.html"
+    frontend_file = frontend_dir / "index.html"
     if frontend_file.exists():
         from flask import send_file
         return send_file(str(frontend_file))
@@ -82,9 +82,27 @@ def home():
 
 @app.route("/app", methods=["GET"])
 def web_app():
-    frontend_file = Path(__file__).parent.parent / "frontend" / "index.html"
+    frontend_file = frontend_dir / "index.html"
     from flask import send_file
     return send_file(str(frontend_file))
+
+
+@app.route("/styles.css", methods=["GET"])
+def serve_styles():
+    css_file = frontend_dir / "styles.css"
+    if css_file.exists():
+        from flask import send_file
+        return send_file(str(css_file), mimetype="text/css")
+    return "", 404
+
+
+@app.route("/app.js", methods=["GET"])
+def serve_app_js():
+    js_file = frontend_dir / "app.js"
+    if js_file.exists():
+        from flask import send_file
+        return send_file(str(js_file), mimetype="application/javascript")
+    return "", 404
 
 
 @app.route("/api", methods=["GET"])
@@ -136,9 +154,13 @@ def get_classes():
 
 
 @app.route("/weather", methods=["GET"])
+@app.route("/api/weather", methods=["GET"])
 def get_weather():
-    """Fetch live weather for caller location via weather module."""
-    payload = fetch_live_weather_snapshot()
+    """Fetch live weather for caller location or queried city via weather module."""
+    lat = request.args.get("lat")
+    lon = request.args.get("lon")
+    city = request.args.get("city")
+    payload = fetch_live_weather_snapshot(lat=lat, lon=lon, city=city)
     return jsonify(payload)
 
 
@@ -176,6 +198,442 @@ def get_disease_knowledge(disease_id):
     if not rec:
         return jsonify({"error": f"No knowledge record found for '{disease_id}'"}), 404
     return jsonify({"success": True, "record": rec})
+
+
+# ── Plant Knowledge Ecosystem & Reference Images ─────────────────────────────
+
+DATASET_RAW_DIR = Path(__file__).parent.parent / "notebooks" / "agrointelli_data" / "data" / "raw" / "plantvillage" / "Plant_leave_diseases_dataset_with_augmentation"
+
+PLANTVILLAGE_DIR_MAP = {
+    "apple_apple_scab": "Apple___Apple_scab",
+    "apple_black_rot": "Apple___Black_rot",
+    "apple_cedar_apple_rust": "Apple___Cedar_apple_rust",
+    "apple_healthy": "Apple___healthy",
+    "blueberry_healthy": "Blueberry___healthy",
+    "cherry_healthy": "Cherry___healthy",
+    "cherry_powdery_mildew": "Cherry___Powdery_mildew",
+    "corn_gray_leaf_spot": "Corn___Cercospora_leaf_spot Gray_leaf_spot",
+    "corn_common_rust": "Corn___Common_rust",
+    "corn_healthy": "Corn___healthy",
+    "corn_northern_leaf_blight": "Corn___Northern_Leaf_Blight",
+    "grape_black_rot": "Grape___Black_rot",
+    "grape_esca_black_measles": "Grape___Esca_(Black_Measles)",
+    "grape_healthy": "Grape___healthy",
+    "grape_leaf_blight": "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)",
+    "orange_haunglongbing_citrus_greening": "Orange___Haunglongbing_(Citrus_greening)",
+    "peach_bacterial_spot": "Peach___Bacterial_spot",
+    "peach_healthy": "Peach___healthy",
+    "pepper_bacterial_spot": "Pepper,_bell___Bacterial_spot",
+    "pepper_healthy": "Pepper,_bell___healthy",
+    "potato_early_blight": "Potato___Early_blight",
+    "potato_healthy": "Potato___healthy",
+    "potato_late_blight": "Potato___Late_blight",
+    "raspberry_healthy": "Raspberry___healthy",
+    "soybean_healthy": "Soybean___healthy",
+    "squash_powdery_mildew": "Squash___Powdery_mildew",
+    "strawberry_healthy": "Strawberry___healthy",
+    "strawberry_leaf_scorch": "Strawberry___Leaf_scorch",
+    "tomato_bacterial_spot": "Tomato___Bacterial_spot",
+    "tomato_early_blight": "Tomato___Early_blight",
+    "tomato_healthy": "Tomato___healthy",
+    "tomato_late_blight": "Tomato___Late_blight",
+    "tomato_leaf_mold": "Tomato___Leaf_Mold",
+    "tomato_septoria_leaf_spot": "Tomato___Septoria_leaf_spot",
+    "tomato_spider_mites_two_spotted_spider_mite": "Tomato___Spider_mites Two-spotted_spider_mite",
+    "tomato_target_spot": "Tomato___Target_Spot",
+    "tomato_mosaic_virus": "Tomato___Tomato_mosaic_virus",
+    "tomato_yellow_leaf_curl_virus": "Tomato___Tomato_Yellow_Leaf_Curl_Virus",
+}
+
+CROPS_CATALOG = {
+    "tomato": {
+        "name": "Tomato",
+        "botanical": "Solanum lycopersicum",
+        "description": "High-value nightshade crop. Extremely vulnerable to early & late blights, bacterial spots, and leaf molds in humid conditions.",
+        "icon": "🍅"
+    },
+    "potato": {
+        "name": "Potato",
+        "botanical": "Solanum tuberosum",
+        "description": "Starchy tuber crop. Frequently threatened by aggressive Phytophthora late blight and Alternaria early blight.",
+        "icon": "🥔"
+    },
+    "corn": {
+        "name": "Corn",
+        "botanical": "Zea mays",
+        "description": "Staple cereal grain. Monitored for airborne common rust pustules, gray leaf spot lesions, and northern leaf blight.",
+        "icon": "🌽"
+    },
+    "apple": {
+        "name": "Apple",
+        "botanical": "Malus domestica",
+        "description": "Temperate tree fruit orchard crop. Susceptible to apple scab defoliation, black rot fruit mummies, and cedar rust.",
+        "icon": "🍎"
+    },
+    "grape": {
+        "name": "Grape",
+        "botanical": "Vitis vinifera",
+        "description": "Perennial vineyard climbing vine. Sensitive to black rot berries, esca black measles trunk decay, and pseudocercospora blight.",
+        "icon": "🍇"
+    },
+    "pepper": {
+        "name": "Pepper",
+        "botanical": "Capsicum annuum",
+        "description": "Warm-season bell pepper vegetable. Prone to bacterial spot epidemics spread by wind-driven rain splash.",
+        "icon": "🫑"
+    },
+    "blueberry": {
+        "name": "Blueberry",
+        "botanical": "Vaccinium corymbosum",
+        "description": "Acid-loving perennial berry shrub with glossy dark-green leaves and high nutrient requirements.",
+        "icon": "🫐"
+    },
+    "cherry": {
+        "name": "Cherry",
+        "botanical": "Prunus avium",
+        "description": "Stone fruit tree crop. Frequently impacted by powdery mildew white mycelial growth on young leaves.",
+        "icon": "🍒"
+    },
+    "orange": {
+        "name": "Orange",
+        "botanical": "Citrus sinensis",
+        "description": "Subtropical evergreen citrus tree threatened by psyllid-vectored Huanglongbing (Citrus Greening HLB).",
+        "icon": "🍊"
+    },
+    "peach": {
+        "name": "Peach",
+        "botanical": "Prunus persica",
+        "description": "Temperate stone fruit species. Affected by Xanthomonas bacterial spot causing shot-hole leaf lesions and defoliation.",
+        "icon": "🍑"
+    },
+    "raspberry": {
+        "name": "Raspberry",
+        "botanical": "Rubus idaeus",
+        "description": "Perennial cane fruit with compound leaves requiring trellis ventilation and steady soil moisture.",
+        "icon": "🍓"
+    },
+    "soybean": {
+        "name": "Soybean",
+        "botanical": "Glycine max",
+        "description": "High-protein legume crop with trifoliate leaves, vital for nitrogen fixation and soil health.",
+        "icon": "🌱"
+    },
+    "squash": {
+        "name": "Squash",
+        "botanical": "Cucurbita pepo",
+        "description": "Broad-leaf cucurbit crop highly prone to foliar powdery mildew fungus during late summer.",
+        "icon": "🎃"
+    },
+    "strawberry": {
+        "name": "Strawberry",
+        "botanical": "Fragaria × ananassa",
+        "description": "Low-growing perennial berry crop. Prone to fungal leaf scorch blotches in rainy or overhead-irrigated beds.",
+        "icon": "🍓"
+    }
+}
+
+_img_files_cache = {}
+
+def get_disease_img_files(disease_id):
+    if disease_id in _img_files_cache:
+        return _img_files_cache[disease_id]
+    # 1. Check bundled lightweight images in frontend/images/diseases/ (suitable for GitHub)
+    bundled_dir = frontend_dir / "images" / "diseases" / disease_id
+    if bundled_dir.exists():
+        files = sorted(list(bundled_dir.glob("*.jpg")) + list(bundled_dir.glob("*.png")) + list(bundled_dir.glob("*.JPG")))
+        if files:
+            _img_files_cache[disease_id] = files
+            return files
+
+    # 2. Fall back to raw PlantVillage dataset directory if available
+    folder = PLANTVILLAGE_DIR_MAP.get(disease_id)
+    if not folder or not DATASET_RAW_DIR.exists():
+        return []
+    p = DATASET_RAW_DIR / folder
+    if not p.exists():
+        return []
+    files = sorted(list(p.glob("*.JPG")) + list(p.glob("*.jpg")) + list(p.glob("*.png")))
+    _img_files_cache[disease_id] = files
+    return files
+
+
+
+@app.route("/api/reference-images/<disease_id>/<int:img_idx>", methods=["GET"])
+def get_reference_image(disease_id, img_idx):
+    """Serves authentic reference leaf images from the real PlantVillage dataset."""
+    from flask import send_file
+    files = get_disease_img_files(disease_id)
+    if not files or img_idx < 0 or img_idx >= len(files):
+        return jsonify({"error": "Reference image not found"}), 404
+    return send_file(str(files[img_idx]), mimetype="image/jpeg")
+
+
+@app.route("/api/plants", methods=["GET"])
+def list_plants():
+    """
+    GET /api/plants
+    Returns all supported agricultural plants, their condition count, metadata,
+    and supported diseases with reference image links and treatment overviews.
+    """
+    try:
+        from .inference import get_all_knowledge
+    except (ImportError, ValueError):
+        from inference import get_all_knowledge
+
+    knowledge_store = get_all_knowledge()
+    posts = db_store.get_community_posts()
+
+    # Precalculate post counts per plant and per disease
+    plant_post_counts = {}
+    disease_post_counts = {}
+    for p in posts:
+        pid = (p.get("plant_id") or "").lower()
+        did = (p.get("disease_id") or "").lower()
+        if pid:
+            plant_post_counts[pid] = plant_post_counts.get(pid, 0) + 1
+        if did:
+            disease_post_counts[did] = disease_post_counts.get(did, 0) + 1
+
+    plants_list = []
+    for plant_id, meta in CROPS_CATALOG.items():
+        # Find all disease records for this plant
+        plant_diseases = []
+        for d_id, rec in knowledge_store.items():
+            if d_id == "background_without_leaves":
+                continue
+            crop_name = rec.get("crop", "").strip().lower()
+            if crop_name == plant_id or d_id.startswith(f"{plant_id}_"):
+                c_name = rec.get("common_name", d_id.replace("_", " ").title())
+                # Clean name: remove redundant plant name prefix if present
+                clean_name = c_name
+                if clean_name.lower().startswith(meta["name"].lower()):
+                    clean_name = clean_name[len(meta["name"]):].strip()
+                if not clean_name:
+                    clean_name = c_name
+
+                img_files = get_disease_img_files(d_id)
+                ref_urls = [f"/api/reference-images/{d_id}/{i}" for i in range(min(5, len(img_files)))]
+
+                is_h = str(rec.get("is_healthy", "False")).lower() == "true"
+                plant_diseases.append({
+                    "id": d_id,
+                    "disease_id": d_id,
+                    "name": clean_name,
+                    "full_name": c_name,
+                    "is_healthy": is_h,
+                    "pathogen": rec.get("pathogen", ""),
+                    "symptoms": rec.get("risk_description", ""),
+                    "treatment": rec.get("treatment_protocol", ""),
+                    "organic_remedies": rec.get("organic_remedies", ""),
+                    "prevention": rec.get("prevention", ""),
+                    "optimal_temp": f"{rec.get('temp_min', 18)}–{rec.get('temp_max', 30)}°C",
+                    "min_humidity": f"{rec.get('humidity_min', 60)}%",
+                    "rain_sensitive": str(rec.get("rain_sensitive", "False")).lower() == "true",
+                    "reference_images": ref_urls,
+                    "community_posts_count": disease_post_counts.get(d_id, 0)
+                })
+
+        # Sort diseases: infected first, healthy last
+        plant_diseases.sort(key=lambda x: (x["is_healthy"], x["name"]))
+
+        # Image representative of the plant (prefer healthy class if available)
+        healthy_d_id = f"{plant_id}_healthy"
+        healthy_imgs = get_disease_img_files(healthy_d_id)
+        if healthy_imgs:
+            rep_img = f"/api/reference-images/{healthy_d_id}/0"
+        elif plant_diseases and plant_diseases[0]["reference_images"]:
+            rep_img = plant_diseases[0]["reference_images"][0]
+        else:
+            rep_img = None
+
+        crop_img_url = f"/images/crops/{plant_id}.jpg" if (frontend_dir / "images" / "crops" / f"{plant_id}.jpg").exists() else rep_img
+
+        plants_list.append({
+            "id": plant_id,
+            "name": meta["name"],
+            "botanical": meta["botanical"],
+            "description": meta["description"],
+            "icon": meta["icon"],
+            "image": crop_img_url,
+            "disease_count": len(plant_diseases),
+            "diseases": plant_diseases,
+            "community_posts_count": plant_post_counts.get(plant_id, 0)
+        })
+
+    return jsonify({
+        "success": True,
+        "count": len(plants_list),
+        "plants": plants_list
+    })
+
+
+@app.route("/api/plants/<plant_id>/diseases", methods=["GET"])
+def list_plant_diseases(plant_id):
+    """GET /api/plants/<plant_id>/diseases: Returns condition details for a specific crop."""
+    target = plant_id.strip().lower()
+    if target not in CROPS_CATALOG:
+        return jsonify({"error": f"Plant '{plant_id}' is not recognized"}), 404
+
+    try:
+        from .inference import get_all_knowledge
+    except (ImportError, ValueError):
+        from inference import get_all_knowledge
+
+    knowledge_store = get_all_knowledge()
+    meta = CROPS_CATALOG[target]
+    plant_diseases = []
+
+    for d_id, rec in knowledge_store.items():
+        if d_id == "background_without_leaves":
+            continue
+        crop_name = rec.get("crop", "").strip().lower()
+        if crop_name == target or d_id.startswith(f"{target}_"):
+            c_name = rec.get("common_name", d_id.replace("_", " ").title())
+            clean_name = c_name
+            if clean_name.lower().startswith(meta["name"].lower()):
+                clean_name = clean_name[len(meta["name"]):].strip()
+            if not clean_name:
+                clean_name = c_name
+
+            img_files = get_disease_img_files(d_id)
+            ref_urls = [f"/api/reference-images/{d_id}/{i}" for i in range(min(5, len(img_files)))]
+
+            plant_diseases.append({
+                "id": d_id,
+                "disease_id": d_id,
+                "name": clean_name,
+                "full_name": c_name,
+                "is_healthy": str(rec.get("is_healthy", "False")).lower() == "true",
+                "pathogen": rec.get("pathogen", ""),
+                "symptoms": rec.get("risk_description", ""),
+                "treatment": rec.get("treatment_protocol", ""),
+                "organic_remedies": rec.get("organic_remedies", ""),
+                "prevention": rec.get("prevention", ""),
+                "reference_images": ref_urls
+            })
+
+    plant_diseases.sort(key=lambda x: (x["is_healthy"], x["name"]))
+    return jsonify({
+        "success": True,
+        "plant_id": target,
+        "plant_name": meta["name"],
+        "count": len(plant_diseases),
+        "diseases": plant_diseases
+    })
+
+
+# ── Plant Health Community Endpoints ─────────────────────────────────────────
+
+@app.route("/api/community/posts", methods=["GET"])
+def get_community_posts_endpoint():
+    plant = request.args.get("plant")
+    disease = request.args.get("disease")
+    posts = db_store.get_community_posts(plant=plant, disease=disease)
+    for p in posts:
+        pid = p.get("post_id") or str(p.get("_id", ""))
+        p["id"] = pid
+        p["post_id"] = pid
+        p.setdefault("comments", [])
+        p.setdefault("comment_count", len(p.get("comments", [])))
+    return jsonify({
+        "success": True,
+        "count": len(posts),
+        "posts": posts
+    })
+
+
+@app.route("/api/community/posts", methods=["POST"])
+def create_community_post_endpoint():
+    data = request.get_json(silent=True) or {}
+    author = (data.get("author") or "Guest Grower").strip()
+    content = (data.get("content") or "").strip()
+    if not content:
+        return jsonify({"error": "Post text content is required."}), 400
+
+    plant_id = (data.get("plant_id") or data.get("plant") or "tomato").strip().lower()
+    disease_id = (data.get("disease_id") or data.get("disease") or "").strip().lower()
+
+    plant_meta = CROPS_CATALOG.get(plant_id, {"name": plant_id.capitalize()})
+    disease_name = data.get("disease_name")
+    if not disease_name and disease_id:
+        disease_name = disease_id.replace("_", " ").title()
+    elif not disease_name:
+        disease_name = "General Health Question"
+
+    post = {
+        "author": author,
+        "author_badge": data.get("author_badge") or ("Grower" if author != "Guest Grower" else "Community Member"),
+        "plant_id": plant_id,
+        "plant_name": plant_meta["name"],
+        "disease_id": disease_id,
+        "disease_name": disease_name,
+        "content": content,
+        "image": data.get("image")
+    }
+
+    saved = db_store.save_community_post(post)
+    return jsonify({"success": True, "post": saved}), 201
+
+
+@app.route("/api/community/posts/<post_id>/vote", methods=["POST"])
+def vote_post_endpoint(post_id):
+    data = request.get_json(silent=True) or {}
+    vote_type = data.get("type", "up")
+    user_id = data.get("user_id", "guest")
+    res = db_store.vote_community_post(post_id, vote_type=vote_type, user_id=user_id)
+    if not res:
+        return jsonify({"error": "Post not found"}), 404
+    return jsonify({"success": True, "vote": res})
+
+
+@app.route("/api/community/posts/<post_id>/comments", methods=["GET"])
+def get_comments_endpoint(post_id):
+    comments = db_store.get_post_comments(post_id)
+    return jsonify({"success": True, "comments": comments})
+
+
+@app.route("/api/community/posts/<post_id>/comments", methods=["POST"])
+def add_comment_endpoint(post_id):
+    data = request.get_json(silent=True) or {}
+    author = (data.get("author") or "Community Member").strip()
+    content = (data.get("content") or "").strip()
+    if not content:
+        return jsonify({"error": "Comment text is required."}), 400
+
+    user_id = (data.get("user_id") or "guest").strip()
+    author_badge = (data.get("author_badge") or ("Grower" if author not in ("Community Member", "Guest Grower") else "Community Member")).strip()
+    comment = {
+        "user_id": user_id,
+        "author": author,
+        "author_badge": author_badge,
+        "content": content
+    }
+    res = db_store.add_post_comment(post_id, comment)
+    if not res:
+        return jsonify({"error": "Post not found"}), 404
+    return jsonify({"success": True, "comment": res}), 201
+
+
+# ── User Preference Endpoints (Last Selected Plant) ──────────────────────────
+
+@app.route("/api/users/preference", methods=["POST"])
+@app.route("/api/users/me/preferences", methods=["PATCH", "POST"])
+def update_user_preferences():
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id") or request.headers.get("X-User-Id")
+    plant = data.get("last_selected_plant") or data.get("plant")
+    if not user_id or not plant:
+        return jsonify({"error": "user_id and last_selected_plant are required"}), 400
+
+    clean_plant = plant.strip().lower()
+    updated = db_store.update_user_preference(user_id, clean_plant)
+    return jsonify({
+        "success": True,
+        "user_id": user_id,
+        "last_selected_plant": clean_plant,
+        "user": updated
+    })
+
 
 
 @app.route("/api/chat", methods=["POST"])
@@ -302,14 +760,18 @@ def predict():
     arch = request.form.get("architecture") or request.args.get("arch")
     force_param = request.form.get("force") or request.args.get("force") or "false"
     force_diagnostic = str(force_param).lower() in ("true", "1", "yes")
+    plant = request.form.get("plant") or request.args.get("plant")
+    city = request.form.get("city") or request.args.get("city")
+    lat = request.form.get("lat") or request.args.get("lat")
+    lon = request.form.get("lon") or request.args.get("lon")
 
     weather = None
     if use_weather:
-        weather_payload = fetch_live_weather_snapshot()
+        weather_payload = fetch_live_weather_snapshot(lat=lat, lon=lon, city=city)
         weather = weather_payload.get("weather")
 
     try:
-        result = run_prediction(img_bgr, field_mode=field_mode, weather=weather, model_choice=arch, force=force_diagnostic)
+        result = run_prediction(img_bgr, field_mode=field_mode, weather=weather, model_choice=arch, force=force_diagnostic, plant=plant)
         result["weather"] = weather
         return jsonify(result)
     except Exception as e:
@@ -347,6 +809,7 @@ def batch_predict():
     arch = request.form.get("architecture") or request.args.get("arch")
     force_param = request.form.get("force") or request.args.get("force") or "false"
     force_diagnostic = str(force_param).lower() in ("true", "1", "yes")
+    plant = request.form.get("plant") or request.args.get("plant")
 
     session_weather = None
     if use_weather:
@@ -360,7 +823,7 @@ def batch_predict():
         if img_bgr is None:
             return jsonify({"error": f"Could not decode image for {label}. Use JPG or PNG."}), 400
 
-        result = predict_with_context(img_bgr, field_mode=field_mode, weather=session_weather, model_choice=arch, force=force_diagnostic)
+        result = predict_with_context(img_bgr, field_mode=field_mode, weather=session_weather, model_choice=arch, force=force_diagnostic, plant=plant)
         item = {
             "label": label,
             "index": idx + 1,
@@ -420,6 +883,7 @@ def auth_login():
         return jsonify({"error": "Invalid username or password."}), 401
 
     clean = {k: v for k, v in user.items() if k not in ("password_hash", "_id")}
+    clean.setdefault("last_selected_plant", user.get("last_selected_plant", "tomato"))
     return jsonify({"success": True, "user": clean})
 
 
@@ -446,18 +910,26 @@ def save_record():
     day_label = data.get("day_label", "Day 1").strip()
     notes = data.get("notes", "").strip()
 
-    prediction_data = data.get("diagnostic") or {}
-    if not prediction_data:
-        return jsonify({"error": "Missing diagnostic payload"}), 400
+    prediction_data = data.get("diagnostic") or data.get("timeline_entry") or {}
+    if not isinstance(prediction_data, dict) or not prediction_data.get("prediction"):
+        return jsonify({"error": "A completed diagnostic payload is required to save this journal entry."}), 400
 
     record_id = data.get("record_id") or f"leaf_{uuid.uuid4().hex[:10]}"
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     day_num = parse_day_num(day_label) or 1
 
     pred_name = prediction_data.get("prediction", "Unknown")
-    aff_pct = prediction_data.get("gradcam", {}).get("affected_pct", 0.0)
-    sev_cat = prediction_data.get("gradcam", {}).get("category", prediction_data.get("severity", {}).get("severity", "Unknown"))
-    gradcam_img = prediction_data.get("gradcam", {}).get("image")
+    gradcam_data = prediction_data.get("gradcam")
+    if not isinstance(gradcam_data, dict):
+        gradcam_data = {}
+    if "affected_pct" not in gradcam_data and "affected_pct" in prediction_data:
+        gradcam_data["affected_pct"] = prediction_data["affected_pct"]
+    severity_data = prediction_data.get("severity")
+    if not isinstance(severity_data, dict):
+        severity_data = {}
+    aff_pct = gradcam_data.get("affected_pct", 0.0)
+    sev_cat = gradcam_data.get("category", severity_data.get("severity", "Unknown"))
+    gradcam_img = gradcam_data.get("image")
     weather_snap = prediction_data.get("weather")
 
     initial_checkin = {
@@ -486,7 +958,9 @@ def save_record():
         "record_id": record_id,
         "user_id": user_id,
         "plant_name": plant_name,
+        "variety": data.get("variety", "").strip(),
         "created_at": now_str,
+        "status": pred_name,
         "initial_prediction": pred_name,
         "latest_prediction": pred_name,
         "latest_affected_pct": aff_pct,
@@ -546,7 +1020,13 @@ def recheck_leaf(record_id):
         if weather_payload.get("success"):
             weather = weather_payload.get("weather")
 
-    diag = run_prediction(img_bgr, field_mode=mode, weather=weather, model_choice=arch)
+    diag = run_prediction(
+        img_bgr,
+        field_mode=mode,
+        weather=weather,
+        model_choice=arch,
+        plant=rec.get("plant_name", "").strip().lower()
+    )
 
     timeline = rec.get("timeline", [])
     prev_entry = timeline[-1] if timeline else None
@@ -629,6 +1109,7 @@ def recheck_leaf(record_id):
     timeline.append(checkin_entry)
     rec["timeline"] = timeline
     rec["latest_prediction"] = new_pred
+    rec["status"] = new_pred
     rec["latest_affected_pct"] = new_aff
     rec["latest_severity"] = new_sev
     rec["latest_day"] = day_label

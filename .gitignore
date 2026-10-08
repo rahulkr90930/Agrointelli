@@ -24,11 +24,13 @@ build/
 agrointelli_data/
 backend/models/*.keras
 !backend/models/agrointelli_phase1_final.keras
+!backend/models/model_mobilenet.keras
 backend/models/*.h5
 backend/models/*.hdf5
 backend/models/*.savedmodel/
 backend/models/*.pb
 backend/models/*.json
+!backend/models/class_index_map.json
 !backend/models/.gitkeep
 
 # OS / editor
@@ -43,3 +45,4 @@ Thumbs.db
 .env.*
 !.env.example
 backend/data_store.json
+scratch/
