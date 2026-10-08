@@ -46,7 +46,7 @@ try:
     from .weather import fetch_live_weather_snapshot, evaluate_weather_progression, parse_day_num
     from .inference import (
         load_model, run_prediction, predict_with_context, decode_uploaded_image,
-        available_models, class_names, TF_AVAILABLE, model
+        available_models, class_names, TF_AVAILABLE, model, normalize_plant_tag
     )
     from .batch import batch_progress_summary, normalize_labels
 except (ImportError, ValueError):
@@ -54,7 +54,7 @@ except (ImportError, ValueError):
     from weather import fetch_live_weather_snapshot, evaluate_weather_progression, parse_day_num
     from inference import (
         load_model, run_prediction, predict_with_context, decode_uploaded_image,
-        available_models, class_names, TF_AVAILABLE, model
+        available_models, class_names, TF_AVAILABLE, model, normalize_plant_tag
     )
     from batch import batch_progress_summary, normalize_labels
 
@@ -1021,14 +1021,25 @@ def recheck_leaf(record_id):
             weather = weather_payload.get("weather")
 
     timeline = rec.get("timeline", [])
-    baseline_prediction = rec.get("initial_prediction") or (
-        timeline[0].get("prediction") if timeline else None
+    baseline_entry = next(
+        (
+            entry
+            for entry in timeline
+            if isinstance(entry, dict) and entry.get("prediction")
+        ),
+        None,
     )
-    crop_filter = (
-        str(baseline_prediction).split("_", 1)[0]
-        if baseline_prediction
-        else rec.get("plant_name", "").strip().lower()
+    baseline_prediction = (
+        (baseline_entry or {}).get("prediction")
+        or rec.get("initial_prediction")
     )
+    crop_filter = normalize_plant_tag(
+        baseline_prediction or rec.get("plant_name", "")
+    )
+    if crop_filter and not any(
+        class_name.startswith(f"{crop_filter}_") for class_name in class_names
+    ):
+        crop_filter = None
     try:
         diag = run_prediction(
             img_bgr,
@@ -1137,7 +1148,10 @@ def recheck_leaf(record_id):
         "diagnostic": diag,
         "comparison": {
             "previous_day": prev_entry.get("day_label", "Baseline") if prev_entry else "Baseline",
-            "previous_date": prev_entry.get("date") or (prev_entry.get("timestamp", "Initial Scan") if prev_entry else "Initial Scan"),
+            "previous_date": (
+                (prev_entry.get("date") or prev_entry.get("timestamp", "Initial Scan"))
+                if prev_entry else "Initial Scan"
+            ),
             "previous_image": prev_img,
             "previous_affected": prev_aff,
             "previous_prediction": prev_pred,
