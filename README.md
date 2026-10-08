@@ -39,7 +39,7 @@ The launcher loads the TensorFlow model, starts the Flask app, and opens the sit
 
 ## Run the Streamlit edition
 
-The separate Streamlit app reuses the existing model and backend modules without changing the Flask frontend or API. It provides crop diagnosis, Grad-CAM results, weather context, and a plant journal. Sign in or create an account in the sidebar to access journal records across sessions; guest journals are limited to the current Streamlit session. The existing Flask app remains the version with community discussions, AgroBot, and browser voice features.
+The separate Streamlit app reuses the existing model and backend modules without changing the Flask frontend or API. It provides crop diagnosis, Grad-CAM results, weather context, and a plant journal with follow-up scans and record deletion. Sign in or create an account in the sidebar to access journal records across sessions; guest journals are limited to the current Streamlit session. The existing Flask app remains the version with community discussions, AgroBot, and browser voice features.
 
 Activate the Python 3.11 virtual environment and install the project requirements as above, then run from the repository root:
 
@@ -93,6 +93,7 @@ Never commit `.env` or put real credentials in `.env.example`. Restart `python r
 - Diagnose supported crop leaves with the bundled TensorFlow model and Grad-CAM overlays.
 - Review disease references and crop-specific treatment guidance.
 - Add initial scans to the plant journal and append dated follow-up scans to the same plant timeline.
+- Delete a plant journal record and its scan timeline from either the Flask or Streamlit journal.
 - Run progression analysis across multiple images with editable day numbers.
 - Ask the AgroBot questions in English, Hindi, or Bengali. Voice input and speech output depend on browser support; speech output is enabled by default and can be muted.
 - Browse grower discussions. Guests can upvote or downvote; posting and replying require signing in.

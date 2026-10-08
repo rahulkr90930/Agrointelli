@@ -1164,8 +1164,12 @@ def delete_record(record_id):
     if request.method == "OPTIONS":
         return jsonify({"success": True}), 200
     user_id = request.args.get("user_id", "").strip()
+    if not user_id:
+        return jsonify({"success": False, "error": "A user ID is required to delete a plant record."}), 400
     deleted = db_store.delete_record(record_id, user_id)
-    return jsonify({"success": True, "deleted": deleted, "message": "Record removed."})
+    if not deleted:
+        return jsonify({"success": False, "deleted": False, "error": "Plant record not found for this user."}), 404
+    return jsonify({"success": True, "deleted": True, "message": "Record removed."})
 
 
 # ── Startup ───────────────────────────────────────────────────────────────────

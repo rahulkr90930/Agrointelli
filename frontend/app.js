@@ -1470,11 +1470,45 @@
           <button class="btn btn-secondary btn-checkin" type="button">
             📸 Add Follow-up Scan
           </button>
+          <button class="btn btn-secondary btn-delete-record" type="button" aria-label="Delete this plant and its scan history">
+            🗑️ Delete Plant
+          </button>
         </div>
       `;
 
       const checkinButton = card.querySelector('.btn-checkin');
       checkinButton.addEventListener('click', () => openFollowupScanModal(rec));
+      const deleteButton = card.querySelector('.btn-delete-record');
+      deleteButton.addEventListener('click', async () => {
+        const recordId = rec.record_id || rec._id || rec.id;
+        if (!recordId) {
+          showToast('Could not identify this plant record.');
+          return;
+        }
+        if (!window.confirm(`Delete ${rec.plant_name || 'this plant'} and its complete scan timeline? This cannot be undone.`)) {
+          return;
+        }
+
+        deleteButton.disabled = true;
+        try {
+          const response = await fetch(
+            `/api/records/${encodeURIComponent(recordId)}?user_id=${encodeURIComponent(getCurrentUserId())}`,
+            { method: 'DELETE' }
+          );
+          const data = await response.json();
+          if (!response.ok || !data.deleted) {
+            showToast(data.error || 'Could not delete this plant record.');
+            return;
+          }
+          showToast('Plant and its scan timeline deleted.');
+          await loadUserJournal();
+        } catch (error) {
+          console.error('Plant record deletion failed:', error);
+          showToast('Network error deleting this plant record.');
+        } finally {
+          deleteButton.disabled = false;
+        }
+      });
 
       dom.plantsJournalGrid.appendChild(card);
     });

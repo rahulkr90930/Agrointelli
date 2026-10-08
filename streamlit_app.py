@@ -417,6 +417,28 @@ elif page == "My plant journal":
                         except (ValueError, RuntimeError, KeyError) as error:
                             st.error(f"Follow-up diagnosis could not be completed: {error}")
 
+            record_id = record.get("record_id")
+            if record_id:
+                confirm_key = f"confirm-delete-{record_id}"
+                if st.button("Delete plant record", key=f"delete-record-{record_id}"):
+                    st.session_state[confirm_key] = True
+
+                if st.session_state.get(confirm_key):
+                    st.warning("Delete this plant and its complete scan timeline? This cannot be undone.")
+                    confirm_col, cancel_col = st.columns(2)
+                    with confirm_col:
+                        if st.button("Yes, delete record", type="primary", key=f"confirm-delete-button-{record_id}"):
+                            if db_store.delete_record(record_id, user_id=user_id):
+                                st.session_state.pop(confirm_key, None)
+                                st.success("Plant record and its scan timeline were deleted.")
+                                st.rerun()
+                            else:
+                                st.error("The record could not be deleted. It may already have been removed.")
+                    with cancel_col:
+                        if st.button("Cancel", key=f"cancel-delete-{record_id}"):
+                            st.session_state.pop(confirm_key, None)
+                            st.rerun()
+
 st.caption(
     "Streamlit edition: diagnosis, Grad-CAM, weather context, and session-scoped journals. "
     "The existing Flask web app remains unchanged and provides community, account, chatbot, and voice features."
