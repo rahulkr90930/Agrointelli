@@ -518,8 +518,9 @@ def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None, fo
         demo_pred = "tomato_early_blight"
         if clean_plant_filter:
             matching = [c for c in (class_names or DEFAULT_CLASSES) if c.startswith(f"{clean_plant_filter}_")]
-            if matching:
-                demo_pred = matching[0]
+            if not matching:
+                raise ValueError(f"No diagnostic classes are available for the selected crop: {clean_plant_filter}.")
+            demo_pred = matching[0]
         demo_gc = generate_gradcam_and_affected_pct(img_bgr, 0, demo_pred, weather=weather, grad_model=grad_model)
         return {
             "prediction"        : demo_pred,
@@ -579,8 +580,9 @@ def run_prediction(img_bgr, field_mode=True, weather=None, model_choice=None, fo
     # Plant-conditioned inference: When user specifies a plant (e.g. Tomato), strictly evaluate only that plant's disease classes
     if clean_plant_filter:
         plant_candidates = [c for c in botanical_probs.keys() if c.startswith(f"{clean_plant_filter}_")]
-        if plant_candidates:
-            botanical_probs = {c: botanical_probs[c] for c in plant_candidates}
+        if not plant_candidates:
+            raise ValueError(f"No diagnostic classes are available for the selected crop: {clean_plant_filter}.")
+        botanical_probs = {c: botanical_probs[c] for c in plant_candidates}
 
     total_p = sum(botanical_probs.values()) + 1e-10
     norm_probs = {c: p / total_p for c, p in botanical_probs.items()}

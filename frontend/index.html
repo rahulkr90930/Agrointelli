@@ -472,6 +472,38 @@
     </div>
   </div>
 
+  <!-- Follow-up scans are entered in a modal so journal cards keep their size. -->
+  <div class="modal-backdrop" id="modal-followup-scan">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Add Follow-up Scan</h3>
+        <button class="modal-close-btn" type="button" aria-label="Close">✕</button>
+      </div>
+      <form id="form-followup-scan" class="journal-checkin-form">
+        <div class="form-field">
+          <label class="form-label" for="checkin-image">Leaf photo</label>
+          <input class="form-input checkin-image" id="checkin-image" type="file" accept="image/*" required />
+        </div>
+        <div class="journal-checkin-fields">
+          <div class="form-field">
+            <label class="form-label" for="checkin-day">Timeline day</label>
+            <input class="form-input checkin-day" id="checkin-day" type="text" readonly required />
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="checkin-date">Scan date</label>
+            <input class="form-input checkin-date" id="checkin-date" type="date" required />
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="checkin-notes">Notes (optional)</label>
+          <textarea class="form-input checkin-notes" id="checkin-notes" rows="2" placeholder="Treatment or changes since the last scan"></textarea>
+        </div>
+        <button class="btn btn-primary checkin-submit" type="submit">Analyze and add to timeline</button>
+      </form>
+      <div id="checkin-result" class="checkin-result" hidden aria-live="polite"></div>
+    </div>
+  </div>
+
   <!-- 4. Image Lightbox Modal -->
   <div class="modal-backdrop" id="modal-lightbox">
     <div style="max-width: 90vw; max-height: 90vh; display: flex; align-items: center; justify-content: center;">

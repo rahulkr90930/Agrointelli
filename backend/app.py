@@ -1020,15 +1020,26 @@ def recheck_leaf(record_id):
         if weather_payload.get("success"):
             weather = weather_payload.get("weather")
 
-    diag = run_prediction(
-        img_bgr,
-        field_mode=mode,
-        weather=weather,
-        model_choice=arch,
-        plant=rec.get("plant_name", "").strip().lower()
-    )
-
     timeline = rec.get("timeline", [])
+    baseline_prediction = rec.get("initial_prediction") or (
+        timeline[0].get("prediction") if timeline else None
+    )
+    crop_filter = (
+        str(baseline_prediction).split("_", 1)[0]
+        if baseline_prediction
+        else rec.get("plant_name", "").strip().lower()
+    )
+    try:
+        diag = run_prediction(
+            img_bgr,
+            field_mode=mode,
+            weather=weather,
+            model_choice=arch,
+            plant=crop_filter
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 422
+
     prev_entry = timeline[-1] if timeline else None
 
     new_pred = diag.get("prediction", "Unknown")

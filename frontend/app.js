@@ -37,7 +37,8 @@
     },
     chatLanguage: 'English',      // 'English' | 'Hindi' | 'Bengali'
     chatTtsEnabled: true,         // Text-to-speech voice output toggle
-    activeScanForJournal: null    // Cached scan to prevent stale form collisions
+    activeScanForJournal: null,   // Cached scan to prevent stale form collisions
+    activeCheckinRecord: null
   };
 
   // ══════════════════════════════════════════════════════════════
@@ -109,6 +110,7 @@
     modalUserAccount: document.getElementById('modal-user-account'),
     modalCreatePost: document.getElementById('modal-create-post'),
     modalSaveJournal: document.getElementById('modal-save-journal'),
+    modalFollowupScan: document.getElementById('modal-followup-scan'),
     modalLightbox: document.getElementById('modal-lightbox'),
     lightboxImg: document.getElementById('lightbox-img'),
 
@@ -1422,13 +1424,6 @@
 
       const timeline = rec.timeline || [];
       const latest = timeline.length ? timeline[timeline.length - 1] : {};
-      const latestDayNumber = Number(
-        rec.latest_day_number ||
-        latest.day_number ||
-        String(latest.day_label || '').match(/\d+/)?.[0] ||
-        timeline.length ||
-        1
-      );
       const status = rec.status || latest.prediction || 'Healthy';
       const isHealthy = status.toLowerCase().includes('healthy');
 
@@ -1472,85 +1467,154 @@
         </section>
 
         <div class="journal-card-footer">
-          <button class="btn btn-secondary btn-checkin" type="button" aria-expanded="false">
+          <button class="btn btn-secondary btn-checkin" type="button">
             📸 Add Follow-up Scan
           </button>
         </div>
-        <form class="journal-checkin-form" hidden>
-          <div class="form-field">
-            <label class="form-label" for="checkin-image-${escapeHtml(rec.record_id)}">Leaf photo</label>
-            <input class="form-input checkin-image" id="checkin-image-${escapeHtml(rec.record_id)}" type="file" accept="image/*" required />
-          </div>
-          <div class="journal-checkin-fields">
-            <div class="form-field">
-              <label class="form-label" for="checkin-day-${escapeHtml(rec.record_id)}">Timeline day</label>
-              <input class="form-input checkin-day" id="checkin-day-${escapeHtml(rec.record_id)}" type="text" value="Day ${latestDayNumber + 1}" required />
-            </div>
-            <div class="form-field">
-              <label class="form-label" for="checkin-date-${escapeHtml(rec.record_id)}">Scan date</label>
-              <input class="form-input checkin-date" id="checkin-date-${escapeHtml(rec.record_id)}" type="date" value="${new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)}" required />
-            </div>
-          </div>
-          <div class="form-field">
-            <label class="form-label" for="checkin-notes-${escapeHtml(rec.record_id)}">Notes (optional)</label>
-            <textarea class="form-input checkin-notes" id="checkin-notes-${escapeHtml(rec.record_id)}" rows="2" placeholder="Treatment or changes since the last scan"></textarea>
-          </div>
-          <button class="btn btn-primary checkin-submit" type="submit">Analyze and add to timeline</button>
-        </form>
       `;
 
       const checkinButton = card.querySelector('.btn-checkin');
-      const checkinForm = card.querySelector('.journal-checkin-form');
-      checkinButton.addEventListener('click', () => {
-        checkinForm.hidden = !checkinForm.hidden;
-        checkinButton.setAttribute('aria-expanded', String(!checkinForm.hidden));
-        if (!checkinForm.hidden) {
-          checkinForm.querySelector('.checkin-image').focus();
-        }
-      });
+      checkinButton.addEventListener('click', () => openFollowupScanModal(rec));
 
-      checkinForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const recordId = rec.record_id || rec._id || rec.id;
-        const image = checkinForm.querySelector('.checkin-image').files[0];
-        if (!recordId || !image) {
-          showToast('Select a leaf photo before adding a follow-up scan.');
+      dom.plantsJournalGrid.appendChild(card);
+    });
+  }
+
+  function timelineDayForDate(record, selectedDate) {
+    const timeline = record.timeline || [];
+    const baseline = timeline[0] || {};
+    const baselineDate = String(baseline.date || record.created_at || '').slice(0, 10);
+    const baselineTime = Date.parse(`${baselineDate}T00:00:00Z`);
+    const selectedTime = Date.parse(`${selectedDate}T00:00:00Z`);
+    if (!Number.isFinite(baselineTime) || !Number.isFinite(selectedTime)) return 'Day 1';
+    const dayNumber = Math.max(1, Math.floor((selectedTime - baselineTime) / 86400000) + 1);
+    return `Day ${dayNumber}`;
+  }
+
+  function openFollowupScanModal(record) {
+    const form = document.getElementById('form-followup-scan');
+    const result = document.getElementById('checkin-result');
+    const dateInput = document.getElementById('checkin-date');
+    const dayInput = document.getElementById('checkin-day');
+    if (!form || !dateInput || !dayInput || !dom.modalFollowupScan) return;
+
+    state.activeCheckinRecord = record;
+    form.reset();
+    if (result) {
+      result.hidden = true;
+      result.innerHTML = '';
+    }
+    dateInput.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    dayInput.value = timelineDayForDate(record, dateInput.value);
+    openModal(dom.modalFollowupScan);
+    document.getElementById('checkin-image').focus();
+  }
+
+  function initFollowupScanForm() {
+    const form = document.getElementById('form-followup-scan');
+    const dateInput = document.getElementById('checkin-date');
+    const dayInput = document.getElementById('checkin-day');
+    const result = document.getElementById('checkin-result');
+    if (!form || !dateInput || !dayInput || !result) return;
+
+    dateInput.addEventListener('change', () => {
+      if (state.activeCheckinRecord && dateInput.value) {
+        dayInput.value = timelineDayForDate(state.activeCheckinRecord, dateInput.value);
+      }
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const record = state.activeCheckinRecord;
+      const recordId = record && (record.record_id || record._id || record.id);
+      const image = form.querySelector('.checkin-image').files[0];
+      if (!recordId || !image) {
+        showToast('Select a leaf photo before adding a follow-up scan.');
+        return;
+      }
+
+      const submitButton = form.querySelector('.checkin-submit');
+      submitButton.disabled = true;
+      submitButton.textContent = 'Analyzing follow-up...';
+      result.hidden = true;
+      const formData = new FormData();
+      formData.append('image', image);
+      formData.append('day_label', dayInput.value);
+      formData.append('date', dateInput.value);
+      formData.append('notes', form.querySelector('.checkin-notes').value.trim());
+      formData.append('use_weather', 'true');
+      formData.append('mode', 'field');
+
+      try {
+        const response = await fetch(`/api/records/${encodeURIComponent(recordId)}/checkin`, {
+          method: 'POST',
+          body: formData
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          showToast(data.error || 'Could not add the follow-up scan.');
           return;
         }
 
-        const submitButton = checkinForm.querySelector('.checkin-submit');
-        submitButton.disabled = true;
-        submitButton.textContent = 'Analyzing follow-up...';
-        const formData = new FormData();
-        formData.append('image', image);
-        formData.append('day_label', checkinForm.querySelector('.checkin-day').value.trim());
-        formData.append('date', checkinForm.querySelector('.checkin-date').value);
-        formData.append('notes', checkinForm.querySelector('.checkin-notes').value.trim());
-        formData.append('use_weather', 'true');
-        formData.append('mode', 'field');
-
-        try {
-          const response = await fetch(`/api/records/${encodeURIComponent(recordId)}/checkin`, {
-            method: 'POST',
-            body: formData
-          });
-          const data = await response.json();
-          if (!response.ok || !data.success) {
-            showToast(data.error || 'Could not add the follow-up scan.');
-            return;
-          }
-          showToast('Follow-up scan added to this plant timeline.');
-          await loadUserJournal();
-        } catch (error) {
-          console.error('Follow-up scan failed:', error);
-          showToast('Network error adding the follow-up scan.');
-        } finally {
-          submitButton.disabled = false;
-          submitButton.textContent = 'Analyze and add to timeline';
-        }
-      });
-
-      dom.plantsJournalGrid.appendChild(card);
+        const checkin = data.latest_checkin || {};
+        const diagnostic = data.diagnostic || {};
+        const gradcam = diagnostic.gradcam || {};
+        const gradcamImage = checkin.gradcam_image || gradcam.image || '';
+        const comparison = data.comparison || {};
+        const risk = diagnostic.spread_risk || {};
+        const weather = checkin.weather || diagnostic.weather || {};
+        const detail = (label, value) => `
+          <div class="checkin-result-detail">
+            <strong>${escapeHtml(label)}</strong>${escapeHtml(String(value))}
+          </div>
+        `;
+        const topClasses = Array.isArray(diagnostic.top3)
+          ? diagnostic.top3.slice(0, 3).map(item => {
+            const name = Array.isArray(item) ? item[0] : '';
+            const probability = Array.isArray(item) ? Number(item[1]) : NaN;
+            return name
+              ? `${String(name).replace(/_/g, ' ')}${Number.isFinite(probability) ? ` (${(probability * 100).toFixed(1)}%)` : ''}`
+              : '';
+          }).filter(Boolean).join(' · ')
+          : '';
+        const detailsHtml = [
+          detail('Crop tracked', record.plant_name || diagnostic.plant || 'Unknown'),
+          detail('Confidence', `${Number(checkin.confidence_pct || diagnostic.confidence_pct || 0).toFixed(1)}%`),
+          detail('Affected leaf area', `${Number(checkin.affected_pct || 0).toFixed(1)}% · ${gradcam.category || checkin.severity || 'Uncategorized'}`),
+          detail('Change since previous scan', `${Number(comparison.delta || 0) > 0 ? '+' : ''}${Number(comparison.delta || 0).toFixed(1)} percentage points`),
+          detail('Progression', checkin.status_tag || comparison.status_tag || checkin.verdict || 'Recorded'),
+          detail('Spread risk', risk.level ? `${risk.level}${risk.score != null ? ` (${Number(risk.score).toFixed(0)}/100)` : ''}` : 'Unavailable'),
+          detail('Weather at scan', [
+            weather.temp_c != null ? `${weather.temp_c}°C` : '',
+            weather.humidity_pct != null ? `${weather.humidity_pct}% humidity` : '',
+            weather.rain_1h_mm != null ? `${weather.rain_1h_mm} mm rain` : ''
+          ].filter(Boolean).join(' · ') || 'Unavailable'),
+          detail('Model', diagnostic.architecture || 'Plant disease classifier')
+        ].join('');
+        const advice = diagnostic.advice || checkin.advice || '';
+        result.innerHTML = `
+          <strong>${escapeHtml(String(checkin.prediction || diagnostic.prediction || 'Diagnosis complete').replace(/_/g, ' '))}</strong>
+          <div>${escapeHtml(checkin.day_label || dayInput.value)} · ${escapeHtml(checkin.date || dateInput.value)}${comparison.days_elapsed != null ? ` · ${Number(comparison.days_elapsed)} days since prior scan` : ''}</div>
+          <div class="checkin-result-details">${detailsHtml}</div>
+          ${comparison.explanation || risk.explanation
+            ? `<p class="checkin-result-advice"><strong>Progress notes:</strong> ${escapeHtml(comparison.explanation || risk.explanation)}</p>`
+            : ''}
+          ${topClasses ? `<p class="checkin-result-advice"><strong>Other likely classes:</strong> ${escapeHtml(topClasses)}</p>` : ''}
+          ${advice ? `<p class="checkin-result-advice"><strong>Care guidance:</strong> ${escapeHtml(advice)}</p>` : ''}
+          ${gradcamImage
+            ? `<img class="checkin-result-image" src="${escapeHtml(gradcamImage)}" alt="Grad-CAM heatmap for the follow-up scan" />`
+            : '<p>Grad-CAM image was not available for this scan.</p>'}
+        `;
+        result.hidden = false;
+        showToast('Follow-up scan added to this plant timeline.');
+        await loadUserJournal();
+      } catch (error) {
+        console.error('Follow-up scan failed:', error);
+        showToast('Network error adding the follow-up scan.');
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Analyze and add to timeline';
+      }
     });
   }
 
@@ -2226,6 +2290,7 @@
     initUser();
     bindGlobalEvents();
     initModals();
+    initFollowupScanForm();
     initChatbot();
     initCreatePostForm();
     initSaveJournalForm();

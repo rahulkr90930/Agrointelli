@@ -1386,20 +1386,31 @@ h1, h2, h3, h4, h5 {
 }
 .journal-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
 }
 .journal-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.5fr);
+  grid-template-areas:
+    "header timeline"
+    "meta timeline"
+    "notes timeline"
+    "footer timeline";
+  align-items: start;
+  column-gap: 1.25rem;
   background: #ffffff;
   border: 1.5px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 1.25rem;
   box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
   transition: var(--ease);
 }
+.journal-card-header { grid-area: header; }
+.journal-meta-row { grid-area: meta; gap: 0.5rem; }
+.journal-notes { grid-area: notes; }
+.journal-timeline { grid-area: timeline; width: 100%; }
+.journal-card-footer { grid-area: footer; }
 .journal-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
@@ -1531,6 +1542,48 @@ h1, h2, h3, h4, h5 {
 .journal-checkin-form .checkin-submit {
   width: 100%;
 }
+.checkin-result {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+}
+.checkin-result-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+.checkin-result-detail {
+  padding: 0.6rem;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  color: var(--text-2);
+  font-size: 0.78rem;
+}
+.checkin-result-detail strong {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: var(--emerald-800);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+.checkin-result-advice {
+  margin-top: 0.75rem;
+  color: var(--text-2);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.checkin-result-image {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  margin-top: 0.75rem;
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+  background: #ffffff;
+}
 .chat-message-content p + p {
   margin-top: 0.45rem;
 }
@@ -1541,27 +1594,6 @@ h1, h2, h3, h4, h5 {
   display: block;
   margin: 0.15rem 0 0.4rem;
   color: var(--emerald-800);
-}
-
-/* Give primary surfaces a gentle layered depth without changing the layout. */
-.hero-section {
-  background:
-    radial-gradient(ellipse at 85% 0%, rgba(52, 211, 153, 0.2), transparent 42%),
-    linear-gradient(125deg, #ffffff 0%, #f0faf4 58%, #e7f5ed 100%);
-  border: 1px solid rgba(16, 185, 129, 0.13);
-  box-shadow: 0 16px 36px rgba(6, 78, 59, 0.08);
-}
-.plant-card,
-.community-post-card,
-.scan-card,
-.journal-card {
-  box-shadow: 0 5px 16px rgba(6, 78, 59, 0.07), 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-.plant-card:hover,
-.community-post-card:hover,
-.scan-card:hover,
-.journal-card:hover {
-  box-shadow: 0 12px 28px rgba(6, 78, 59, 0.12), 0 3px 8px rgba(15, 23, 42, 0.05);
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -2161,6 +2193,11 @@ h1, h2, h3, h4, h5 {
   .plants-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
   .batch-slots-row { grid-template-columns: 1fr; }
   .journal-checkin-fields { grid-template-columns: 1fr; gap: 0; }
+  .journal-card {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "header" "meta" "notes" "timeline" "footer";
+  }
+  .checkin-result-details { grid-template-columns: minmax(0, 1fr); }
   .fab-container {
     bottom: calc(var(--bottom-nav-h) + 14px);
     right: 14px;
