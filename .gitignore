@@ -44,6 +44,5 @@ Thumbs.db
 .env
 .env.*
 !.env.example
-.streamlit/secrets.toml
 backend/data_store.json
 scratch/

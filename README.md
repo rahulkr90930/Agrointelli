@@ -37,26 +37,21 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 The launcher loads the TensorFlow model, starts the Flask app, and opens the site in your browser at <http://127.0.0.1:5000>. Keep the terminal open while using AgroIntelli; press **Ctrl+C** there to stop it. The frontend is served by Flask, so do not open `frontend\index.html` directly as a file.
 
-## Run the Streamlit edition
+## Share a hosted app for free
 
-The separate Streamlit app reuses the existing model and backend modules without changing the Flask frontend or API. It provides crop diagnosis, Grad-CAM results, weather context, and a plant journal with follow-up scans and record deletion. Sign in or create an account in the sidebar to access journal records across sessions; guest journals are limited to the current Streamlit session. The existing Flask app remains the version with community discussions, AgroBot, and browser voice features.
+The existing Flask app serves the full frontend and API together. The repository includes a Render Blueprint (`render.yaml`) configured for Python 3.11.9, the Flask health check, and the production Gunicorn server.
 
-Activate the Python 3.11 virtual environment and install the project requirements as above, then run from the repository root:
+To deploy your own instance:
 
-```powershell
-streamlit run streamlit_app.py
-```
+1. Push or fork this repository on GitHub.
+2. Sign in to [Render](https://render.com/) and choose **New → Blueprint**.
+3. Connect your GitHub account and select the `Agrointelli` repository and `v2` branch.
+4. Review the service from `render.yaml` and create it. Once the build and health check pass, Render provides a public URL that you can share.
+5. For persistent accounts, journals, discussions, comments, and votes, add your own `MONGO_URI` in the Render service's environment settings. `MONGO_DB_NAME` and `OWM_API_KEY` are optional. Never put credentials in GitHub.
 
-Streamlit opens the app in your browser. Stop it with **Ctrl+C** in the terminal.
+The free web-service tier is suitable for trying and sharing a demo, but it may sleep when idle and take time to wake. Free-tier resource quotas and availability can change. TensorFlow model initialization can also exceed a small instance's memory allowance; if a build or startup fails for resource reasons, use a smaller/optimized model or a host with more memory. The fallback JSON database is local to the service and may be lost when the host restarts or replaces its instance, so use MongoDB for data you need to keep.
 
-### Deploy on Streamlit Community Cloud
-
-1. Push the repository to GitHub.
-2. In [Streamlit Community Cloud](https://share.streamlit.io/), create an app using this repository, the `v2` branch, and `streamlit_app.py` as the entrypoint.
-3. In **Advanced settings**, select **Python 3.11** to match the tested TensorFlow environment.
-4. Add a `MONGO_URI` secret pointing to your own MongoDB Atlas database so accounts and journal records persist across app restarts. You can also set `MONGO_DB_NAME` and `OWM_API_KEY` secrets. Do not commit credentials or a `secrets.toml` file.
-
-Without MongoDB, accounts and records use the local JSON fallback. Files on hosted app instances may be ephemeral, so configure MongoDB for persistent hosted accounts and journals. Streamlit Community Cloud's free resources and availability are subject to its current limits.
+Friends can also deploy their own copy from the same GitHub repository using the steps above, or clone and run the project locally with the Python 3.11 instructions. Each independently deployed copy has its own database configuration and data.
 
 ### macOS or Linux
 
@@ -93,7 +88,7 @@ Never commit `.env` or put real credentials in `.env.example`. Restart `python r
 - Diagnose supported crop leaves with the bundled TensorFlow model and Grad-CAM overlays.
 - Review disease references and crop-specific treatment guidance.
 - Add initial scans to the plant journal and append dated follow-up scans to the same plant timeline.
-- Delete a plant journal record and its scan timeline from either the Flask or Streamlit journal.
+- Delete a plant journal record and its scan timeline from the Flask journal.
 - Run progression analysis across multiple images with editable day numbers.
 - Ask the AgroBot questions in English, Hindi, or Bengali. Voice input and speech output depend on browser support; speech output is enabled by default and can be muted.
 - Browse grower discussions. Guests can upvote or downvote; posting and replying require signing in.
@@ -105,7 +100,6 @@ backend/       Flask API, inference, chatbot, weather and persistence modules
 frontend/      Web interface assets
 notebooks/     Model training and data preparation notebooks
 run.py         Local application launcher
-streamlit_app.py  Optional Streamlit diagnosis and journal entry point
 requirements.txt
 ```
 
@@ -114,4 +108,5 @@ requirements.txt
 - **Wrong Python version:** Activate `.venv` and run `python --version`. Recreate the environment with `py -3.11 -m venv .venv` if it is not Python 3.11.
 - **TensorFlow or package installation fails:** Confirm Python is 64-bit and 3.11, activate `.venv`, then retry `python -m pip install -r requirements.txt`.
 - **The app does not open:** Wait for TensorFlow and the model to finish loading. Open <http://127.0.0.1:5000> manually and check <http://127.0.0.1:5000/health>.
+- **Hosted deployment runs out of memory:** The TensorFlow model loads during server startup. Use an instance with more memory or deploy an optimized/smaller inference model.
 - **No Gemini or MongoDB connection:** These services are optional. Check the `.env` settings and restart the app; local chatbot and JSON persistence are available as fallbacks.

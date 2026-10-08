@@ -1,7 +1,6 @@
 # Core Web App
 flask>=3.0,<4
 flask-cors>=4.0,<5
-streamlit>=1.41,<2
 requests>=2.31,<3
 pymongo>=4.0
 gunicorn>=21.2,<23; sys_platform != 'win32'
