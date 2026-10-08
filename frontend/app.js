@@ -1575,6 +1575,7 @@
       formData.append('image', image);
       formData.append('day_label', dayInput.value);
       formData.append('date', dateInput.value);
+      formData.append('plant', String(record.plant_name || ''));
       formData.append('notes', form.querySelector('.checkin-notes').value.trim());
       formData.append('use_weather', 'true');
       formData.append('mode', 'field');
@@ -1613,6 +1614,7 @@
           : '';
         const detailsHtml = [
           detail('Crop tracked', record.plant_name || diagnostic.plant || 'Unknown'),
+          detail('Crop filter applied', data.crop_filter || diagnostic.plant || 'Auto-detect'),
           detail('Confidence', `${Number(checkin.confidence_pct || diagnostic.confidence_pct || 0).toFixed(1)}%`),
           detail('Affected leaf area', `${Number(checkin.affected_pct || 0).toFixed(1)}% · ${gradcam.category || checkin.severity || 'Uncategorized'}`),
           detail('Change since previous scan', `${Number(comparison.delta || 0) > 0 ? '+' : ''}${Number(comparison.delta || 0).toFixed(1)} percentage points`),

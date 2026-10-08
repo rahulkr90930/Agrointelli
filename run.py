@@ -9,6 +9,7 @@ Usage:
 import os
 import sys
 import time
+import socket
 import subprocess
 import webbrowser
 from threading import Thread
@@ -61,10 +62,15 @@ def start_backend():
     except Exception as e:
         print(f"❌ Server error: {e}")
 
-def open_frontend():
+def is_port_in_use(port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        return sock.connect_ex(("127.0.0.1", port)) == 0
+
+
+def open_frontend(port):
     print("⏳ Waiting for backend and TensorFlow to initialize...")
     import urllib.request
-    url = "http://127.0.0.1:5000/health"
+    url = f"http://127.0.0.1:{port}/health"
     for _ in range(40):  # Poll for up to 20 seconds
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "AgroIntelli-Launcher"})
@@ -75,7 +81,7 @@ def open_frontend():
             pass
         time.sleep(0.5)
     
-    app_url = "http://127.0.0.1:5000/"
+    app_url = f"http://127.0.0.1:{port}/"
 
     # Detect cloud headless environments (Codespaces, Replit, Binder, Gitpod, Docker)
     is_headless_cloud = any(
@@ -102,8 +108,16 @@ def open_frontend():
 
 if __name__ == "__main__":
     try:
+        port = int(os.environ.get("PORT", "5000"))
+        if is_port_in_use(port):
+            print(
+                f"❌ Port {port} is already in use. Stop the existing AgroIntelli "
+                "server before restarting; no browser was opened."
+            )
+            sys.exit(1)
+
         # Start a background daemon thread to trigger opening the frontend
-        opener_thread = Thread(target=open_frontend, daemon=True)
+        opener_thread = Thread(target=open_frontend, args=(port,), daemon=True)
         opener_thread.start()
         
         # Start backend blocking on the main thread

@@ -1033,7 +1033,9 @@ def recheck_leaf(record_id):
         (baseline_entry or {}).get("prediction")
         or rec.get("initial_prediction")
     )
-    crop_filter = normalize_plant_tag(rec.get("plant_name", ""))
+    crop_filter = normalize_plant_tag(request.form.get("plant"))
+    if not crop_filter:
+        crop_filter = normalize_plant_tag(rec.get("plant_name", ""))
     if not crop_filter or not any(
         class_name.startswith(f"{crop_filter}_") for class_name in class_names
     ):
@@ -1145,6 +1147,7 @@ def recheck_leaf(record_id):
 
     return jsonify({
         "success": True,
+        "crop_filter": crop_filter,
         "record": saved,
         "latest_checkin": checkin_entry,
         "diagnostic": diag,
