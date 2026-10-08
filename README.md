@@ -37,6 +37,27 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 The launcher loads the TensorFlow model, starts the Flask app, and opens the site in your browser at <http://127.0.0.1:5000>. Keep the terminal open while using AgroIntelli; press **Ctrl+C** there to stop it. The frontend is served by Flask, so do not open `frontend\index.html` directly as a file.
 
+## Run the Streamlit edition
+
+The separate Streamlit app reuses the existing model and backend modules without changing the Flask frontend or API. It provides crop diagnosis, Grad-CAM results, weather context, and a plant journal. Sign in or create an account in the sidebar to access journal records across sessions; guest journals are limited to the current Streamlit session. The existing Flask app remains the version with community discussions, AgroBot, and browser voice features.
+
+Activate the Python 3.11 virtual environment and install the project requirements as above, then run from the repository root:
+
+```powershell
+streamlit run streamlit_app.py
+```
+
+Streamlit opens the app in your browser. Stop it with **Ctrl+C** in the terminal.
+
+### Deploy on Streamlit Community Cloud
+
+1. Push the repository to GitHub.
+2. In [Streamlit Community Cloud](https://share.streamlit.io/), create an app using this repository, the `v2` branch, and `streamlit_app.py` as the entrypoint.
+3. In **Advanced settings**, select **Python 3.11** to match the tested TensorFlow environment.
+4. Add a `MONGO_URI` secret pointing to your own MongoDB Atlas database so accounts and journal records persist across app restarts. You can also set `MONGO_DB_NAME` and `OWM_API_KEY` secrets. Do not commit credentials or a `secrets.toml` file.
+
+Without MongoDB, accounts and records use the local JSON fallback. Files on hosted app instances may be ephemeral, so configure MongoDB for persistent hosted accounts and journals. Streamlit Community Cloud's free resources and availability are subject to its current limits.
+
 ### macOS or Linux
 
 Install Python 3.11, then from the repository directory run:
@@ -83,6 +104,7 @@ backend/       Flask API, inference, chatbot, weather and persistence modules
 frontend/      Web interface assets
 notebooks/     Model training and data preparation notebooks
 run.py         Local application launcher
+streamlit_app.py  Optional Streamlit diagnosis and journal entry point
 requirements.txt
 ```
 
