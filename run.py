@@ -106,15 +106,37 @@ def open_frontend(port):
             except Exception:
                 pass
 
+def free_port(port):
+    """Kills any process currently occupying the given port."""
+    if sys.platform.startswith("win"):
+        try:
+            cmd = f"netstat -ano | findstr :{port}"
+            out = subprocess.check_output(cmd, shell=True).decode("utf-8", errors="ignore")
+            pids = set()
+            for line in out.strip().splitlines():
+                parts = line.strip().split()
+                if len(parts) >= 5 and "LISTENING" in line.upper() and f":{port}" in parts[1]:
+                    pids.add(parts[-1])
+            for pid in pids:
+                if pid and pid != str(os.getpid()):
+                    print(f"🔄 Freeing port {port} (stopping stale process PID {pid})...")
+                    subprocess.call(f"taskkill /F /PID {pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(1.5)
+        except Exception:
+            pass
+    else:
+        try:
+            subprocess.call(f"fuser -k {port}/tcp", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(1)
+        except Exception:
+            pass
+
 if __name__ == "__main__":
     try:
         port = int(os.environ.get("PORT", "5000"))
         if is_port_in_use(port):
-            print(
-                f"❌ Port {port} is already in use. Stop the existing AgroIntelli "
-                "server before restarting; no browser was opened."
-            )
-            sys.exit(1)
+            print(f"⚠️ Port {port} is currently occupied. Freeing port for fresh launch...")
+            free_port(port)
 
         # Start a background daemon thread to trigger opening the frontend
         opener_thread = Thread(target=open_frontend, args=(port,), daemon=True)
