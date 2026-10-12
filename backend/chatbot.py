@@ -44,14 +44,15 @@ except (ImportError, ValueError):
 
 # Gemini SDK setup
 _gemini_client = None
-_active_gemini_model = "gemini-3.8-flash"
+_active_gemini_model = "gemini-3.5-flash"
+GEMINI_MODELS_CASCADE = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash"]
 
 if IS_VALID_GEMINI_KEY:
     try:
         import google.generativeai as genai
         genai.configure(api_key=GEMINI_API_KEY)
         _gemini_client = genai
-        _active_gemini_model = "gemini-3.8-flash"
+        _active_gemini_model = "gemini-3.5-flash"
         print(f"🌿 AgroIntelli Chatbot initialized with Google Gemini API ({_active_gemini_model}).")
     except Exception as e:
         print(f"ℹ️ Google Gemini SDK notice: {e}. Local plant science expert active.")
@@ -59,13 +60,20 @@ else:
     print("🌿 AgroIntelli Chatbot initialized in ultra-fast local plant science expert mode.")
 
 SYSTEM_PROMPT = """You are AgroIntelli AI (AgroBot), a master agricultural scientist, plant pathologist, and expert botanist (Plantist).
+You possess comprehensive horticultural and botanical expertise across ALL crops, fruits, vegetables, grains, berries, herbs, and ornamental plants on Earth (including Potato, Tomato, Strawberry, Mango, Corn, Pepper, Apple, Grape, Blueberry, Carrot, Onion, Lettuce, etc.).
 
 CORE BEHAVIOR RULES:
 1. ANSWER EXACTLY WHAT THE USER ASKS:
-   - PLANTING / CULTIVATION / GROWING (e.g., 'how do i plant a potato', 'how to grow tomatoes', 'when to sow corn'):
-     * Act strictly as an expert plant scientist & grower.
-     * Explain seed/tuber selection, soil requirements (pH, composition), planting depth, spacing, sunlight, watering needs, and germination timeline.
-     * DO NOT fabricate, assume, or bring up plant diseases or chemical fungicides unless the user explicitly asks about diseases!
+   - PLANTING / CULTIVATION / GROWING (e.g., 'how do i plant strawberry', 'how to grow mango', 'how do i plant a potato'):
+     * Act strictly as an expert botanist and horticulturist.
+     * Provide comprehensive, practical cultivation instructions:
+       a) Propagation/Seed/Crown/Tuber Preparation (e.g. for strawberries, crown placement level with soil line; for potatoes, chitting tubers).
+       b) Soil Requirements: Ideal soil texture, composition, organic matter, and precise pH range.
+       c) Planting Depth, Technique & Spacing between plants and rows.
+       d) Sunlight & Solar Exposure (daily direct sunlight hours).
+       e) Irrigation & Moisture Regimen (water quantity, frequency, avoiding overhead wetting).
+       f) Time to Germination & Harvest Timeline.
+     * DO NOT fabricate, assume, or bring up plant diseases, blights, or chemical fungicides unless the user explicitly asks about diseases!
    - HARVESTING & STORAGE:
      * Focus on optimal maturity indicators, picking techniques, curing, and storage conditions.
    - PRUNING & CANOPY MANAGEMENT:
@@ -84,20 +92,44 @@ CORE BEHAVIOR RULES:
    - Only reference an uploaded leaf photo if the user explicitly asks about 'my photo', 'my leaf', 'this scan', or 'my diagnosis'.
 
 3. TONE & STRUCTURE:
-   - Professional, encouraging, scientifically accurate, and farmer-friendly.
+   - Professional, encouraging, scientifically authoritative, and practical.
    - Use bold highlights and clean bullet points.
 """
 
 FAST_GEN_CONFIG = {
-    "max_output_tokens": 800,
+    "max_output_tokens": 1200,
     "temperature": 0.25,
 }
+
+
+def _extract_gemini_reply(response):
+    """Safely extracts text from Gemini response, including when finish_reason is MAX_TOKENS."""
+    if not response:
+        return ""
+    try:
+        if response.text:
+            return response.text.strip()
+    except Exception:
+        pass
+    try:
+        if hasattr(response, 'candidates') and response.candidates:
+            parts = response.candidates[0].content.parts
+            txt = "".join(p.text for p in parts if hasattr(p, 'text')).strip()
+            if txt:
+                return txt
+    except Exception:
+        pass
+    return ""
 
 # Supported crops for entity matching
 CROPS_LIST = [
     "tomato", "potato", "corn", "apple", "grape", "orange",
     "cherry", "peach", "pepper", "strawberry", "squash",
-    "soybean", "blueberry", "raspberry"
+    "soybean", "blueberry", "raspberry", "mango", "banana",
+    "watermelon", "melon", "onion", "garlic", "carrot", "lettuce",
+    "cucumber", "cabbage", "cauliflower", "spinach", "eggplant",
+    "brinjal", "chili", "chilli", "pea", "peas", "bean", "beans",
+    "wheat", "rice", "cotton", "coffee", "tea", "sugarcane", "ginger"
 ]
 
 # Disease keyword lookup map
@@ -191,6 +223,65 @@ CROP_CULTIVATION_GUIDE = {
             ("Sunlight & Drainage", "Citrus trees demand full sunlight (8+ hours) and sandy, well-draining soil. Standing water causes rapid Phytophthora root rot."),
             ("Planting Depth", "Plant slightly elevated so the root collar sits 2–3 cm above the surrounding grade; never bury the graft union."),
             ("Irrigation & Feeding", "Water deeply every 7–10 days during warm months, allowing the top 5 cm of soil to dry between waterings. Feed quarterly with balanced citrus fertilizer containing zinc, iron, and manganese.")
+        ]
+    },
+    "strawberry": {
+        "title": "Master Strawberry Planting & Cultivation Guide",
+        "steps": [
+            ("Crown Depth & Orientation", "Plant bare-root or potted crowns so that the midpoint of the central crown sits exactly level with the soil surface. Burying the crown leads to crown rot; leaving roots exposed causes desiccation."),
+            ("Soil Drainage & pH Requirements", "Strawberries demand fertile, sandy loam with superb drainage and a slightly acidic pH of 5.5–6.5. Incorporate 5–8 cm of aged compost into the top 15 cm of soil."),
+            ("Spacing & Bed Layout", "Space plants 30–45 cm (12–18 inches) apart in rows 90 cm apart, or 30 cm apart in raised beds. Stagger plantings for maximum airflow."),
+            ("Mulching with Clean Straw", "Spread a 5 cm layer of clean wheat straw, pine needles, or black plastic mulch around plants. Mulch keeps developing fruit off moist soil, suppresses weeds, and moderates soil temperature."),
+            ("Watering & Care", "Deliver 25–40 mm of water weekly via root drip irrigation. Pinch off first-month blossoms on June-bearing plants to stimulate strong crown and root establishment."),
+            ("Harvesting Schedule", "Harvest berries when fully colored red down to the calyx. Pick gently in cool mornings with stems attached.")
+        ]
+    },
+    "blueberry": {
+        "title": "Master Blueberry Planting & Acidic Soil Management",
+        "steps": [
+            ("Acidic Soil Requirement", "Blueberries strictly require acidic soil with a pH of 4.5–5.5. Amend planting soil heavily with peat moss, pine bark, or elemental sulfur to reach optimal acidity."),
+            ("Planting Depth & Spacing", "Space highbush varieties 1.2–1.5 meters apart. Plant at the same depth as the nursery container; never bury stems deeper."),
+            ("Mulching & Shallow Roots", "Blueberries have shallow, fine root systems without root hairs. Maintain an 8–10 cm layer of pine needle or wood chip mulch and water consistently using drip irrigation.")
+        ]
+    },
+    "raspberry": {
+        "title": "Master Raspberry Cane Planting & Trellising Guide",
+        "steps": [
+            ("Site & Trellis Support", "Plant in full sun in deep, fertile, moisture-retentive soil (pH 6.0–6.8). Install a sturdy two-wire post trellis (at 0.8m and 1.5m heights)."),
+            ("Planting Bare-Root Canes", "Plant dormant canes 45–60 cm apart in rows 1.8–2.4 m apart. Cut canes back to 20 cm after planting to stimulate vigorous new basal shoots."),
+            ("Cane Pruning System", "Prune out spent floricanes (fruiting wood) immediately after harvest, leaving 4–6 vigorous primocanes per plant for the next year.")
+        ]
+    },
+    "peach": {
+        "title": "Master Peach Tree Planting & Orchard Care",
+        "steps": [
+            ("Sunlight & Chill Hours", "Plant in full direct sun in well-drained loamy soil (pH 6.0–6.8). Verify that the variety matches your area's winter chill hours (400–800 hours below 7°C)."),
+            ("Planting & Graft Union", "Dig a wide planting hole. Position the tree so the graft union sits 5–8 cm above the final grade. Water deeply to settle soil."),
+            ("Open-Center Pruning", "Prune at planting to establish an 'open-center' (vase) scaffold with 3–4 primary limbs, allowing sun into the canopy core.")
+        ]
+    },
+    "cherry": {
+        "title": "Master Cherry Tree Planting & Care Guide",
+        "steps": [
+            ("Soil Drainage & Exposure", "Plant in deep, well-draining soil (pH 6.2–6.8) with full sun. Avoid frost pockets and waterlogged ground."),
+            ("Spacing & Pollination", "Space sweet cherries 4–6 meters apart (sour cherries 3–4 meters). Ensure you have compatible cross-pollinators unless planting a self-fertile variety."),
+            ("Summer Pruning", "Prune cherry trees in mid-summer rather than winter dormancy to reduce susceptibility to bacterial canker (*Pseudomonas*).")
+        ]
+    },
+    "squash": {
+        "title": "Master Squash (Zucchini & Winter Squash) Guide",
+        "steps": [
+            ("Warm Soil & Hill Sowing", "Sow outdoors when soil reaches 18–21°C (65–70°F). Plant in mounds/hills 2.5 cm deep (4–5 seeds per hill, thinning to 2–3 strongest plants)."),
+            ("Spacing & Sun", "Bush varieties require 90 cm spacing; vining varieties require 1.5–2 m. Provide at least 6–8 hours of intense direct sunlight."),
+            ("Watering at Base", "Deliver 25–50 mm of water weekly directly at the base with soaker hoses. Avoid overhead wetting to prevent foliar mildew.")
+        ]
+    },
+    "soybean": {
+        "title": "Master Soybean Cultivation & Nitrogen Fixation Guide",
+        "steps": [
+            ("Bacterial Inoculation", "Inoculate seeds with *Bradyrhizobium japonicum* prior to sowing to maximize root nodule nitrogen fixation."),
+            ("Sowing Depth & Spacing", "Sow seeds 2.5–4 cm deep when soil reaches 15°C (60°F). Space seeds 5–8 cm apart in rows 38–76 cm apart in full sun."),
+            ("Harvesting", "Harvest green edamame pods when plump and 80–90% filled; for dry beans, wait until leaves turn yellow and drop and pods are completely brown.")
         ]
     }
 }
@@ -373,6 +464,31 @@ def has_agronomic_intent(query):
     return any(re.search(r'\b' + re.escape(term) + r'\b', q) for term in agri_terms)
 
 
+def extract_plant_name_from_query(query):
+    """Extracts the botanical crop or plant name from freeform user inquiries."""
+    if not query:
+        return None
+    q = query.lower().strip()
+    
+    patterns = [
+        (r"(?:how (?:do i|to|can i)\s+)?(?:plant|grow|sow|care for|prune|harvest)\s+(?:a|an|the)?\s*([a-z]+(?:\s+[a-z]+)?)", 1),
+        (r"(?:plant|grow|sow|care for)\s+(?:a|an|the)?\s*([a-z]+(?:\s+[a-z]+)?)", 1),
+    ]
+    for pat, group_idx in patterns:
+        m = re.search(pat, q)
+        if m:
+            cand = m.group(group_idx).strip()
+            cand = re.sub(r'\b(in|at|on|with|from|and|for|my|our|garden|pot|indoor|outdoors|home|season|winter|summer|spring)\b.*', '', cand).strip()
+            if cand and len(cand) >= 3 and cand not in ["tree", "plant", "crop", "seed", "disease"]:
+                return cand
+
+    for crop in CROPS_LIST:
+        if re.search(r'\b' + re.escape(crop) + r'\b', q):
+            return crop
+
+    return None
+
+
 def match_disease_or_crop_from_query(query):
     """
     Extracts explicitly mentioned disease and crop.
@@ -407,6 +523,11 @@ def match_disease_or_crop_from_query(query):
                         return k, v, crop
             # No disease mentioned, just crop!
             return None, None, crop
+
+    # 4. Freeform botanical plant extraction
+    cand_plant = extract_plant_name_from_query(query)
+    if cand_plant:
+        return None, None, cand_plant
 
     return None, None, None
 
@@ -486,53 +607,56 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
     is_pruning = is_pruning_inquiry(msg)
     is_disease = is_disease_or_symptom_inquiry(msg)
 
-    # 5. Execute via Google Gemini (gemini-3.8-flash)
+    # 5. Execute via Google Gemini Cascade (gemini-3.5-flash -> gemini-3.5-flash-lite -> gemini-3.8-flash)
     if IS_VALID_GEMINI_KEY and _gemini_client is not None:
-        try:
-            target_model = "gemini-3.8-flash"
-            weather_desc = f"{weather.get('temp_c', '26')}°C, {weather.get('humidity_pct', '65')}% humidity, Rain: {weather.get('rain_1h_mm', '0')} mm/h"
+        weather_desc = f"{weather.get('temp_c', '26')}°C, {weather.get('humidity_pct', '65')}% humidity, Rain: {weather.get('rain_1h_mm', '0')} mm/h"
 
-            prompt_parts = [
-                f"{SYSTEM_PROMPT}\n",
-                f"[USER QUERY CONTEXT]",
-                f"- User Query Crop: {query_crop or 'General Botany'}",
-                f"- Category: {'Planting/Growing' if is_planting else 'Disease Prevention' if is_prevention else 'Harvesting' if is_harvest else 'Pruning' if is_pruning else 'Pathology' if is_disease else 'General Farming'}",
-                f"- Local Microclimate Weather: {weather_desc}",
-            ]
+        prompt_parts = [
+            f"{SYSTEM_PROMPT}\n",
+            f"[USER QUERY CONTEXT]",
+            f"- Identified Crop/Plant: {query_crop or 'General Botany'}",
+            f"- Category: {'Planting/Growing' if is_planting else 'Disease Prevention' if is_prevention else 'Harvesting' if is_harvest else 'Pruning' if is_pruning else 'Pathology' if is_disease else 'General Farming'}",
+            f"- Local Microclimate Weather: {weather_desc}",
+        ]
 
-            # ONLY inject previous scan telemetry if the user is actually asking about their scan
-            if user_asking_active_scan and scanned_pred:
-                prompt_parts.append(f"- Active Scanned Leaf: {scanned_pred} ({conf}% confidence, {aff_pct}% blade area affected)")
-            elif is_trajectory_flag:
-                prompt_parts.append(f"- Multi-day Trajectory Data: {scan_ctx}")
+        # ONLY inject previous scan telemetry if the user is actually asking about their scan
+        if user_asking_active_scan and scanned_pred:
+            prompt_parts.append(f"- Active Scanned Leaf: {scanned_pred} ({conf}% confidence, {aff_pct}% blade area affected)")
+        elif is_trajectory_flag:
+            prompt_parts.append(f"- Multi-day Trajectory Data: {scan_ctx}")
 
-            if is_journal and mongo_summary:
-                prompt_parts.append(f"- User MongoDB Plant Journal History:\n{mongo_summary}")
+        if is_journal and mongo_summary:
+            prompt_parts.append(f"- User MongoDB Plant Journal History:\n{mongo_summary}")
 
-            prompt_parts.extend([
-                f"\n[USER QUESTION]",
-                f"{msg}\n",
-                f"[STRICT INSTRUCTIONS]",
-                f"1. Answer what the user specifically asked. If they asked how to plant/grow a crop, give full planting instructions (soil, depth, spacing, watering, hilling, sunlight). DO NOT talk about disease unless asked!",
-                f"2. If they asked for disease prevention, provide prophylactic cultural and biological steps.",
-                f"3. Target Language: {language}.",
-                f"4. Do not use raw markdown heading markers (#). Use bold text and bullet points."
-            ])
+        prompt_parts.extend([
+            f"\n[USER QUESTION]",
+            f"{msg}\n",
+            f"[STRICT INSTRUCTIONS]",
+            f"1. Answer what the user specifically asked. If they asked how to plant/grow ANY plant (e.g. Strawberry, Mango, Potato, Tomato, etc.), give full botanical instructions: propagation/seed/crown preparation, soil requirements (composition & pH), planting depth, spacing, sunlight, watering needs, and time to harvest. DO NOT talk about disease or fungicides unless explicitly asked!",
+            f"2. If they asked for disease prevention, provide prophylactic cultural, biological, and irrigation management.",
+            f"3. Target Language: {language}.",
+            f"4. Do not use raw markdown heading markers (#). Use bold text and bullet points."
+        ])
 
-            full_prompt = "\n".join(prompt_parts)
-            model_inst = _gemini_client.GenerativeModel(
-                model_name=target_model,
-                generation_config=FAST_GEN_CONFIG
-            )
-            response = model_inst.generate_content(full_prompt)
-            if response and response.text:
-                return {
-                    "reply": response.text.strip(),
-                    "grounded": True,
-                    "model_used": f"Google {target_model}"
-                }
-        except Exception as e:
-            print(f"⚠️ Gemini Chat generation notice ({e}); transitioning seamlessly to local expert.")
+        full_prompt = "\n".join(prompt_parts)
+
+        for target_model in GEMINI_MODELS_CASCADE:
+            try:
+                model_inst = _gemini_client.GenerativeModel(
+                    model_name=target_model,
+                    generation_config=FAST_GEN_CONFIG
+                )
+                response = model_inst.generate_content(full_prompt)
+                reply_text = _extract_gemini_reply(response)
+                if reply_text:
+                    return {
+                        "reply": reply_text,
+                        "grounded": True,
+                        "model_used": f"Google {target_model}"
+                    }
+            except Exception as e:
+                print(f"ℹ️ Gemini Chat notice with {target_model} ({e}); trying next model...")
+                continue
 
     # 6. High-Accuracy Local Plant Science Expert Fallback
     reply = _build_local_grounded_reply(
@@ -598,9 +722,9 @@ def _build_local_grounded_reply(
             "How can I assist your crop or garden today?"
         )
 
-    # 2. Planting & Cultivation Guide (e.g. "how do i plant a potato")
+    # 2. Planting & Cultivation Guide (e.g. "how do i plant strawberry", "how to grow mango", "how do i plant a potato")
     if is_planting:
-        target_crop = (query_crop or "potato").lower()
+        target_crop = (query_crop or extract_plant_name_from_query(query) or "Your Plant").lower()
         if target_crop in CROP_CULTIVATION_GUIDE:
             guide = CROP_CULTIVATION_GUIDE[target_crop]
             steps_rendered = "\n".join([f"{i+1}. **{title}**:\n   {desc}" for i, (title, desc) in enumerate(guide["steps"])])
@@ -608,20 +732,27 @@ def _build_local_grounded_reply(
                 f"### 🌱 {guide['title']}\n\n"
                 f"Here is the complete, practical botanical guide to planting and growing **{target_crop.title()}**:\n\n"
                 f"{steps_rendered}\n\n"
-                f"**Botanist Tip**: Always ensure soil temperature is appropriate before planting to prevent seed/tuber rot in cold, wet soil."
+                f"**Botanist Tip**: Always ensure soil temperature and moisture are appropriate before planting to establish strong root architecture."
             )
         else:
             return (
-                f"### 🌱 Planting & Sowing Guidelines for **{target_crop.title()}**\n\n"
-                f"1. **Soil & Sunlight**: Ensure rich, loose, well-draining soil with 6–8 hours of daily direct sunlight.\n"
-                f"2. **Planting Depth**: Sow seeds at a depth approximately 2–3 times their diameter; keep soil gently moist until germination.\n"
-                f"3. **Spacing**: Space adequately to allow full vegetative development and strong air circulation.\n"
-                f"4. **Initial Care**: Water at the soil base early in the morning."
+                f"### 🌱 Master Botanical Planting & Cultivation Guide for **{target_crop.title()}**\n\n"
+                f"As your precision plant scientist, here is the clinical horticultural protocol for planting and cultivating **{target_crop.title()}**:\n\n"
+                f"1. **Soil Preparation & pH Requirements**:\n"
+                f"   Ensure loose, well-aerated loamy soil rich in aged organic compost. Most garden plants thrive in a slightly acidic to neutral pH (6.0–6.8) with excellent drainage to prevent root rot and waterlogging.\n\n"
+                f"2. **Sunlight & Solar Exposure**:\n"
+                f"   Position in a location receiving 6–8 hours of full, direct sunlight daily for optimal photosynthesis and vegetative vigor. In scorching summer climates, provide light afternoon shade.\n\n"
+                f"3. **Planting Depth & Spacing Technique**:\n"
+                f"   If sowing seeds, plant at a depth approximately 2–3 times the seed diameter. If transplanting crowns or root balls, set the plant so the root collar aligns exactly with the soil surface (never bury central crowns). Space adequately to allow full canopy airflow.\n\n"
+                f"4. **Irrigation & Moisture Regimen**:\n"
+                f"   Deliver 25–35 mm of water per week at ground level using drip irrigation early in the morning. Keep soil evenly moist while avoiding wet foliage to protect against foliar infections.\n\n"
+                f"5. **Nutrient Feeding & Mulching**:\n"
+                f"   Top-dress with clean organic mulch (straw or shredded bark) to conserve soil moisture and moderate soil temperature. Apply a balanced N-P-K fertilizer during active leaf and root development."
             )
 
     # 3. Disease Prevention Protocol (e.g. "how could i prevent potato disease")
     if is_prevention:
-        target_crop = (query_crop or "potato").lower()
+        target_crop = (query_crop or extract_plant_name_from_query(query) or "Your Plant").lower()
         if target_crop in CROP_PREVENTION_GUIDE:
             guide = CROP_PREVENTION_GUIDE[target_crop]
             steps_rendered = "\n".join([f"{i+1}. **{title}**:\n   {desc}" for i, (title, desc) in enumerate(guide["steps"])])
