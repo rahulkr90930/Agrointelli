@@ -234,7 +234,7 @@ def is_planting_inquiry(query):
 def is_harvest_inquiry(query):
     """Detects inquiries about harvesting, picking, curing, or storing crops."""
     q = query.lower()
-    harvest_words = ["harvest", "harvesting", "when to pick", "storage", "store", "keeping", "cure", "curing", "todna"]
+    harvest_words = ["harvest", "harvesting", "when to pick", "storage", "store", "keeping", "post-harvest curing", "curing tubers", "todna"]
     return any(re.search(r'\b' + re.escape(w) + r'\b', q) for w in harvest_words)
 
 
@@ -454,6 +454,11 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
     mongo_summary = scan_ctx.get("mongo_history_summary", "")
     is_trajectory_flag = scan_ctx.get("is_trajectory", False) or is_trajectory_inquiry(msg)
 
+    # User explicitly asking about the uploaded scan?
+    user_asking_active_scan = any(w in msg.lower() for w in [
+        "this scan", "my scan", "this leaf", "my leaf", "my photo", "the diagnosis", "what disease is this"
+    ])
+
     # 4. Entity Extraction & Intent Classification
     query_key, query_rec, query_crop = match_disease_or_crop_from_query(msg)
     user_asked_different_crop = False
@@ -462,14 +467,16 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
     active_pred = scanned_pred
 
     if query_rec:
+        active_knowledge = query_rec
+        active_pred = query_key
         if not scanned_pred or (query_crop and query_crop.lower() not in (scanned_pred or "").lower()):
             user_asked_different_crop = True
-            active_knowledge = query_rec
-            active_pred = query_key
     elif query_crop:
-        user_asked_different_crop = True
-        active_knowledge = None
-        active_pred = query_crop
+        if not user_asking_active_scan:
+            active_knowledge = None
+            active_pred = query_crop
+        if not scanned_pred or (query_crop.lower() not in (scanned_pred or "").lower()):
+            user_asked_different_crop = True
 
     is_weather = is_weather_inquiry(msg)
     is_journal = is_journal_inquiry(msg)
@@ -478,11 +485,6 @@ def generate_chat_response(user_message, scan_context=None, history=None, langua
     is_harvest = is_harvest_inquiry(msg)
     is_pruning = is_pruning_inquiry(msg)
     is_disease = is_disease_or_symptom_inquiry(msg)
-
-    # User explicitly asking about the uploaded scan?
-    user_asking_active_scan = any(w in msg.lower() for w in [
-        "this scan", "my scan", "this leaf", "my leaf", "my photo", "the diagnosis", "what disease is this"
-    ])
 
     # 5. Execute via Google Gemini (gemini-3.8-flash)
     if IS_VALID_GEMINI_KEY and _gemini_client is not None:
@@ -676,7 +678,37 @@ def _build_local_grounded_reply(
             f"Ensure good row ventilation and switch to morning ground-level drip irrigation."
         )
 
-    # 6. Harvesting & Storage
+    # 6. Disease & Treatment (ONLY when disease/symptom is actually asked)
+    if is_disease:
+        if knowledge:
+            crop = knowledge.get("crop", query_crop or "Crop").title()
+            d_name = knowledge.get("common_name", (active_pred or "Plant Disease").replace("_", " ").title())
+            pathogen = knowledge.get("pathogen", "Pathogenic microorganism")
+            chem = knowledge.get("treatment_protocol", "Apply standard fungicide spray as per label recommendations.")
+            org = knowledge.get("organic_remedies", "Spray cold-pressed neem oil (5 ml/L with 1 ml mild liquid soap).")
+            prev = knowledge.get("prevention", "Maintain adequate plant spacing, sanitize pruning shears, and remove fallen infected leaves.")
+
+            return (
+                f"### 💊 Treatment & Pathology Protocol for **{d_name}** ({crop})\n\n"
+                f"- **Causal Pathogen**: *{pathogen}*\n\n"
+                f"#### 1. Targeted Chemical Protocol:\n"
+                f"{chem}\n\n"
+                f"#### 2. Organic & Biological Alternatives:\n"
+                f"{org}\n\n"
+                f"#### 3. Cultural Sanitation & Prevention:\n"
+                f"{prev}"
+            )
+        else:
+            c_title = (query_crop or "Plant").title()
+            return (
+                f"### 🩺 Plant Pathology & Care Protocol for **{c_title}**\n\n"
+                f"1. **Symptom Isolation**: Immediately prune and safely dispose of heavily spotted or chlorotic foliage to prevent spread.\n"
+                f"2. **Biological Spray**: Apply cold-pressed neem oil (5 ml/L water with mild liquid soap) or *Bacillus subtilis* early in the morning.\n"
+                f"3. **Targeted Protectant**: For fungal blights or spots, apply a broad-spectrum copper-based or chlorothalonil spray following label directions.\n"
+                f"4. **Irrigation Adjustments**: Switch strictly to ground-level drip irrigation; wet leaf canopies accelerate infection."
+            )
+
+    # 7. Harvesting & Storage
     if is_harvest:
         c_title = (query_crop or "Crop").title()
         return (
@@ -684,26 +716,6 @@ def _build_local_grounded_reply(
             f"1. **Harvest Timing**: Harvest when fruit or tubers reach mature size and coloration, preferably on a dry morning after dew has evaporated.\n"
             f"2. **Curing**: For root crops (like potatoes), allow harvested produce to cure in a dry, ventilated, shaded area for 7–10 days to toughen skins.\n"
             f"3. **Storage Conditions**: Store in a cool, dark, well-aerated area (ideal temperature 7–10°C) away from direct sunlight."
-        )
-
-    # 7. Disease & Treatment (ONLY when disease/symptom is actually asked)
-    if is_disease and knowledge:
-        crop = knowledge.get("crop", query_crop or "Crop").title()
-        d_name = knowledge.get("common_name", (active_pred or "Plant Disease").replace("_", " ").title())
-        pathogen = knowledge.get("pathogen", "Pathogenic microorganism")
-        chem = knowledge.get("treatment_protocol", "Apply standard fungicide spray as per label recommendations.")
-        org = knowledge.get("organic_remedies", "Spray cold-pressed neem oil (5 ml/L with 1 ml mild liquid soap).")
-        prev = knowledge.get("prevention", "Maintain adequate plant spacing, sanitize pruning shears, and remove fallen infected leaves.")
-
-        return (
-            f"### 💊 Treatment & Pathology Protocol for **{d_name}** ({crop})\n\n"
-            f"- **Causal Pathogen**: *{pathogen}*\n\n"
-            f"#### 1. Targeted Chemical Protocol:\n"
-            f"{chem}\n\n"
-            f"#### 2. Organic & Biological Alternatives:\n"
-            f"{org}\n\n"
-            f"#### 3. Cultural Sanitation & Prevention:\n"
-            f"{prev}"
         )
 
     # 8. User asking about their active scan
