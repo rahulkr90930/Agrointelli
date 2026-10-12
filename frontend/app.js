@@ -772,6 +772,13 @@
       const res = await fetch(`/api/community/posts/${postId}/comments`);
       const data = await res.json();
       if (data && data.comments) {
+        // Update reply count badge on post card
+        const postCard = document.getElementById(`post-${postId}`);
+        if (postCard) {
+          const countEl = postCard.querySelector('.comment-count');
+          if (countEl) countEl.textContent = data.comments.length;
+        }
+
         if (data.comments.length === 0) {
           listEl.innerHTML = `<div style="padding: 0.5rem; font-size: 0.8rem; color: var(--text-3); font-style: italic;">No replies yet. Be the first to share agronomic advice!</div>`;
           return;
@@ -796,7 +803,8 @@
 
   async function submitComment(postId, content, inputEl) {
     if (!state.user || !state.user.username) {
-      showToast('Please sign in or create an account to reply to fellow growers.');
+      showToast('Please sign in or create an account to reply.');
+      renderUserAccountModal();
       openModal(dom.modalUserAccount);
       return;
     }
@@ -814,6 +822,12 @@
         })
       });
       const data = await res.json();
+      if (res.status === 401 || (data && data.redirect_login)) {
+        showToast('Please sign in or create an account to reply.');
+        renderUserAccountModal();
+        openModal(dom.modalUserAccount);
+        return;
+      }
       if (data && data.success) {
         inputEl.value = '';
         showToast('Reply posted successfully!');
@@ -823,6 +837,8 @@
           const countEl = postCard.querySelector('.comment-count');
           if (countEl) countEl.textContent = parseInt(countEl.textContent || '0', 10) + 1;
         }
+      } else {
+        showToast(data.error || 'Failed to post reply.');
       }
     } catch (e) {
       showToast('Failed to post reply.');
@@ -1370,6 +1386,13 @@
   // ══════════════════════════════════════════════════════════════
   async function loadUserJournal() {
     if (!dom.plantsJournalGrid) return;
+
+    // Intercept guest: guests do not have a personal persistent journal
+    if (!state.user || !state.user.username) {
+      renderGuestJournalPrompt();
+      return;
+    }
+
     const userId = getCurrentUserId();
 
     dom.plantsJournalGrid.innerHTML = `
@@ -1391,6 +1414,34 @@
     } catch (err) {
       console.error('Failed to load user records:', err);
       renderEmptyJournal();
+    }
+  }
+
+  function renderGuestJournalPrompt() {
+    if (!dom.plantsJournalGrid) return;
+    dom.plantsJournalGrid.innerHTML = `
+      <div style="grid-column: 1 / -1; padding: 3.5rem 1.5rem; text-align: center; background: #ffffff; border-radius: var(--radius-xl); border: 1.5px dashed var(--border);">
+        <div style="font-size: 3rem; margin-bottom: 0.75rem;">🔐</div>
+        <h3 style="color: var(--emerald-900); margin-bottom: 0.35rem;">Sign In to Access Your Plant Journal</h3>
+        <p style="color: var(--text-3); font-size: 0.88rem; max-width: 440px; margin: 0 auto 1.5rem;">
+          Sign in or create a grower account to record leaf diagnoses, track Grad-CAM healing progression over time, and keep your personal plant notes.
+        </p>
+        <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+          <button class="btn btn-primary" id="btn-guest-journal-signin" type="button">
+            🌱 Sign In / Create Account
+          </button>
+          <button class="btn btn-outline-emerald" type="button" onclick="window.agroSwitchTab('scan')">
+            🔬 Scan Leaf as Guest
+          </button>
+        </div>
+      </div>
+    `;
+    const btnSignIn = document.getElementById('btn-guest-journal-signin');
+    if (btnSignIn) {
+      btnSignIn.addEventListener('click', () => {
+        renderUserAccountModal();
+        openModal(dom.modalUserAccount);
+      });
     }
   }
 
@@ -1525,11 +1576,41 @@
     return `Day ${dayNumber}`;
   }
 
+  function getPlantFromRecord(record) {
+    if (!record) return '';
+    const timeline = record.timeline || [];
+    const baseline = timeline[0] || {};
+    const firstPred = baseline.prediction || record.initial_prediction || record.status || '';
+    const knownCrops = ['tomato', 'potato', 'corn', 'apple', 'grape', 'cherry', 'peach', 'pepper', 'strawberry', 'squash', 'orange', 'blueberry', 'soybean', 'raspberry'];
+    const pLower = firstPred.toLowerCase();
+    for (const crop of knownCrops) {
+      if (pLower.startsWith(crop + '_') || pLower === crop) {
+        return crop;
+      }
+    }
+    const nameLower = String(record.plant_name || '').toLowerCase();
+    for (const crop of knownCrops) {
+      if (nameLower.includes(crop)) {
+        return crop;
+      }
+    }
+    return record.plant_id || '';
+  }
+
   function openFollowupScanModal(record) {
+    if (!state.user || !state.user.username) {
+      showToast('Please sign in or create an account to record follow-up scans.');
+      renderUserAccountModal();
+      openModal(dom.modalUserAccount);
+      return;
+    }
+
     const form = document.getElementById('form-followup-scan');
     const result = document.getElementById('checkin-result');
     const dateInput = document.getElementById('checkin-date');
     const dayInput = document.getElementById('checkin-day');
+    const cropBadge = document.getElementById('checkin-crop-badge');
+    const cropHidden = document.getElementById('checkin-crop-hidden');
     if (!form || !dateInput || !dayInput || !dom.modalFollowupScan) return;
 
     state.activeCheckinRecord = record;
@@ -1538,6 +1619,19 @@
       result.hidden = true;
       result.innerHTML = '';
     }
+
+    // Fix crop for follow-up scan based on the first plant scan
+    const lockedCrop = getPlantFromRecord(record);
+    if (lockedCrop) {
+      const capCrop = lockedCrop.charAt(0).toUpperCase() + lockedCrop.slice(1);
+      if (cropBadge) cropBadge.innerHTML = `🌱 <span>Tracked Crop: <strong>${capCrop}</strong> (Fixed for this plant timeline)</span>`;
+      if (cropHidden) cropHidden.value = lockedCrop;
+    } else {
+      const pName = escapeHtml(record.plant_name || 'Crop Leaf');
+      if (cropBadge) cropBadge.innerHTML = `🌱 <span>Tracked Plant: <strong>${pName}</strong></span>`;
+      if (cropHidden) cropHidden.value = '';
+    }
+
     dateInput.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
     dayInput.value = timelineDayForDate(record, dateInput.value);
     openModal(dom.modalFollowupScan);
@@ -1559,6 +1653,13 @@
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (!state.user || !state.user.username) {
+        showToast('Please sign in or create an account to record follow-up scans.');
+        renderUserAccountModal();
+        openModal(dom.modalUserAccount);
+        return;
+      }
+
       const record = state.activeCheckinRecord;
       const recordId = record && (record.record_id || record._id || record.id);
       const image = form.querySelector('.checkin-image').files[0];
@@ -1571,11 +1672,15 @@
       submitButton.disabled = true;
       submitButton.textContent = 'Analyzing follow-up...';
       result.hidden = true;
+
+      const lockedCrop = (document.getElementById('checkin-crop-hidden')?.value) || getPlantFromRecord(record);
+
       const formData = new FormData();
       formData.append('image', image);
       formData.append('day_label', dayInput.value);
       formData.append('date', dateInput.value);
-      formData.append('plant', String(record.plant_name || ''));
+      formData.append('plant', lockedCrop || String(record.plant_name || ''));
+      formData.append('user_id', getCurrentUserId());
       formData.append('notes', form.querySelector('.checkin-notes').value.trim());
       formData.append('use_weather', 'true');
       formData.append('mode', 'field');
@@ -2184,6 +2289,13 @@
 
   // --- Save Scan to Journal Modal ---
   function openSaveJournalModal(scanResult) {
+    if (!state.user || !state.user.username) {
+      showToast('Please sign in or create an account to save plants to your personal journal.');
+      renderUserAccountModal();
+      openModal(dom.modalUserAccount);
+      return;
+    }
+
     if (!dom.modalSaveJournal) return;
     state.activeScanForJournal = scanResult;
     const cropInput = document.getElementById('journal-crop-input');
@@ -2206,6 +2318,13 @@
     if (!form) return;
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (!state.user || !state.user.username) {
+        showToast('Please sign in or create an account to save plants to your personal journal.');
+        renderUserAccountModal();
+        openModal(dom.modalUserAccount);
+        return;
+      }
+
       const plantName = document.getElementById('journal-crop-input').value.trim() || 'My Plant';
       const variety = document.getElementById('journal-variety-input').value.trim();
       const notes = document.getElementById('journal-notes-input').value.trim();
@@ -2233,6 +2352,12 @@
           body: JSON.stringify(payload)
         });
         const data = await res.json();
+        if (res.status === 401 || (data && data.redirect_login)) {
+          showToast('Please sign in or create an account to save plants to your personal journal.');
+          renderUserAccountModal();
+          openModal(dom.modalUserAccount);
+          return;
+        }
         if (res.ok && data.success) {
           form.reset();
           state.activeScanForJournal = null;
@@ -2305,6 +2430,18 @@
     if (dom.btnScanSelectedCrop) {
       dom.btnScanSelectedCrop.addEventListener('click', () => {
         agroScanCrop(state.selectedPlantId);
+      });
+    }
+
+    if (dom.btnNewPlantEntry) {
+      dom.btnNewPlantEntry.addEventListener('click', () => {
+        if (!state.user || !state.user.username) {
+          showToast('Please sign in or create an account to record plant check-ins.');
+          renderUserAccountModal();
+          openModal(dom.modalUserAccount);
+          return;
+        }
+        switchTab('scan');
       });
     }
 

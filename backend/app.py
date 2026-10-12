@@ -606,7 +606,13 @@ def add_comment_endpoint(post_id):
     if not content:
         return jsonify({"error": "Comment text is required."}), 400
 
-    user_id = (data.get("user_id") or "guest").strip()
+    user_id = (data.get("user_id") or "").strip()
+    if not user_id or user_id == "guest":
+        return jsonify({
+            "error": "Please sign in or create an account to reply to community discussions.",
+            "redirect_login": True
+        }), 401
+
     author_badge = (data.get("author_badge") or ("Grower" if author not in ("Community Member", "Guest Grower") else "Community Member")).strip()
     comment = {
         "user_id": user_id,
@@ -693,9 +699,11 @@ def chat():
         context["mongo_history_summary"] = "\n".join(history_lines)
         context["mongo_records_count"] = len(user_records)
 
-    # If NO live photo is uploaded, ground chatbot using the latest MongoDB record
+    # Only ground on historical latest record if user explicitly asks about their saved plant/leaf/history
     pred = context.get("prediction")
-    if not pred and user_records:
+    msg_low = message.lower()
+    asks_saved_plant = any(w in msg_low for w in ["my plant", "my leaf", "my saved", "my crop", "journal", "timeline", "check-in", "checkin", "history", "previous scan", "meri fasal"])
+    if not pred and user_records and asks_saved_plant:
         latest_rec = user_records[0]
         context["is_historical"] = True
         context["plant_name"] = latest_rec.get("plant_name", "Tracked Crop")
@@ -897,7 +905,15 @@ def auth_login():
 
 @app.route("/api/records", methods=["GET"])
 def list_records():
-    user_id = request.args.get("user_id", "guest").strip()
+    user_id = request.args.get("user_id", "").strip()
+    if not user_id or user_id == "guest":
+        return jsonify({
+            "success": True,
+            "count": 0,
+            "records": [],
+            "storage_mode": "MongoDB" if db_store.is_mongo else "Resilient Local",
+            "is_guest": True
+        })
     records = db_store.get_user_records(user_id)
     return jsonify({
         "success": True,
@@ -911,7 +927,13 @@ def list_records():
 @app.route("/api/records", methods=["POST"])
 def save_record():
     data = request.get_json(silent=True) or {}
-    user_id = data.get("user_id", "guest").strip()
+    user_id = data.get("user_id", "").strip()
+    if not user_id or user_id == "guest":
+        return jsonify({
+            "error": "Please sign in or create an account to save plants to your personal journal.",
+            "redirect_login": True
+        }), 401
+
     plant_name = data.get("plant_name", "").strip() or "Tracked Crop Leaf"
     day_label = data.get("day_label", "Day 1").strip()
     notes = data.get("notes", "").strip()
@@ -1001,6 +1023,11 @@ def recheck_leaf(record_id):
     if not rec:
         return jsonify({"error": "Leaf record not found"}), 404
 
+    # Ensure guest users cannot add follow-up scans
+    req_user_id = request.form.get("user_id") or request.headers.get("X-User-Id")
+    if req_user_id == "guest":
+        return jsonify({"error": "Please sign in or create an account to record follow-up scans.", "redirect_login": True}), 401
+
     if "image" not in request.files:
         return jsonify({"error": "No leaf photo uploaded"}), 400
 
@@ -1038,18 +1065,16 @@ def recheck_leaf(record_id):
     baseline_prediction = (
         (baseline_entry or {}).get("prediction")
         or rec.get("initial_prediction")
+        or rec.get("status")
     )
-    crop_filter = normalize_plant_tag(request.form.get("plant"))
-    if not crop_filter:
-        crop_filter = normalize_plant_tag(rec.get("plant_name", ""))
-    if not crop_filter or not any(
-        class_name.startswith(f"{crop_filter}_") for class_name in class_names
-    ):
-        crop_filter = normalize_plant_tag(baseline_prediction)
+
+    # For follow-up scans, strictly fix crop to initial plant scan, removing the auto-detect default
+    initial_crop = normalize_plant_tag(baseline_prediction) or normalize_plant_tag(rec.get("plant_name", ""))
+    crop_filter = normalize_plant_tag(request.form.get("plant")) or initial_crop
     if crop_filter and not any(
         class_name.startswith(f"{crop_filter}_") for class_name in class_names
     ):
-        crop_filter = None
+        crop_filter = initial_crop
     try:
         diag = run_prediction(
             img_bgr,

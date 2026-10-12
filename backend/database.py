@@ -405,38 +405,69 @@ class StorageManager:
         }
 
     def get_post_comments(self, post_id):
-        """Returns comments for a post, querying normalized community_comments when available."""
+        """Returns all comments for a post, merging decoupled collection and post record comments."""
         if not post_id:
             return []
         p_str = str(post_id).strip()
+        all_comments = []
+        seen_keys = set()
+
+        def _add_comment(c):
+            if not isinstance(c, dict):
+                return
+            c_dict = dict(c)
+            if "_id" in c_dict:
+                c_dict["_id"] = str(c_dict["_id"])
+            cid = c_dict.get("comment_id")
+            content = c_dict.get("content", "").strip()
+            author = c_dict.get("author", "").strip()
+            created_at = c_dict.get("created_at", "")
+            dedup_key = cid if cid else f"{author}_{created_at}_{content}"
+            if dedup_key not in seen_keys:
+                seen_keys.add(dedup_key)
+                all_comments.append(c_dict)
+
         if self.is_mongo:
             try:
-                # Query decoupled community_comments collection first
-                cursor = self.db.community_comments.find({"post_id": p_str}).sort("created_at", 1)
-                comments_list = []
-                for doc in cursor:
-                    if "_id" in doc:
-                        doc["_id"] = str(doc["_id"])
-                    comments_list.append(doc)
-                if comments_list:
-                    return comments_list
-
-                # Fallback to embedded array on post document
                 from bson import ObjectId
                 q = {"$or": [{"post_id": p_str}, {"_id": p_str}]}
                 if ObjectId.is_valid(p_str):
                     q["$or"].append({"_id": ObjectId(p_str)})
                 p_doc = self.db.community_posts.find_one(q)
+
+                # 1. Embedded comments from post
                 if p_doc and "comments" in p_doc:
-                    return p_doc["comments"]
+                    for c in p_doc.get("comments", []):
+                        _add_comment(c)
+
+                # 2. Decoupled collection comments
+                target_ids = {p_str}
+                if p_doc:
+                    if p_doc.get("post_id"):
+                        target_ids.add(str(p_doc["post_id"]))
+                    if p_doc.get("_id"):
+                        target_ids.add(str(p_doc["_id"]))
+
+                cursor = self.db.community_comments.find({"post_id": {"$in": list(target_ids)}}).sort("created_at", 1)
+                for doc in cursor:
+                    _add_comment(doc)
+
+                if all_comments:
+                    all_comments.sort(key=lambda x: str(x.get("created_at", "")))
+                    return all_comments
             except Exception as e:
                 print(f"⚠️ [MongoDB] get_post_comments notice: {e}")
 
+        # Fallback for local storage
         posts = self.get_community_posts()
         for p in posts:
             if p.get("post_id") == p_str or str(p.get("_id")) == p_str or str(p.get("id")) == p_str:
-                return p.get("comments", [])
-        return []
+                for c in p.get("comments", []):
+                    _add_comment(c)
+                break
+
+        all_comments.sort(key=lambda x: str(x.get("created_at", "")))
+        return all_comments
 
     def add_post_comment(self, post_id, comment):
         """Adds a comment to a community post, writing to both decoupled collection and post record."""

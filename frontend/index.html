@@ -481,6 +481,13 @@
       </div>
       <form id="form-followup-scan" class="journal-checkin-form">
         <div class="form-field">
+          <label class="form-label">Tracked Plant (Locked Crop)</label>
+          <div id="checkin-crop-badge" class="checkin-crop-badge" style="padding: 0.55rem 0.85rem; background: var(--emerald-50); border: 1.5px solid var(--emerald-200); border-radius: var(--radius-md); font-weight: 600; color: var(--emerald-900); font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
+            🌱 <span>Tracked Crop: Locked for this plant timeline</span>
+          </div>
+          <input type="hidden" id="checkin-crop-hidden" name="plant" value="" />
+        </div>
+        <div class="form-field">
           <label class="form-label" for="checkin-image">Leaf photo</label>
           <input class="form-input checkin-image" id="checkin-image" type="file" accept="image/*" required />
         </div>
