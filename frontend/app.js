@@ -191,10 +191,25 @@
     }
   }
 
+  function clearChatbotState() {
+    state.chatHistory = [];
+    state.activeScanResult = null;
+    if (dom.chatMessages) {
+      dom.chatMessages.innerHTML = '';
+    }
+    if (dom.chatInput) {
+      dom.chatInput.value = '';
+    }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
   function logoutUser() {
     state.user = null;
     localStorage.removeItem('agro_user');
     updateUserUI();
+    clearChatbotState();
     showToast('Signed out. Switched to Guest Mode.');
     closeModal(dom.modalUserAccount);
     renderUserAccountModal();
@@ -848,6 +863,7 @@
   // ══════════════════════════════════════════════════════════════
   // SCAN PAGE: SINGLE SCAN & TIMELINE PROGRESSION
   // ══════════════════════════════════════════════════════════════
+  let scanHandlersInitialized = false;
   function initScanView() {
     if (dom.scanTabSingle && dom.scanTabTimeline) {
       dom.scanTabSingle.onclick = () => switchScanMode('single');
@@ -861,8 +877,11 @@
       dom.timelineCropSelect.value = state.selectedPlantId || '';
     }
 
-    initSingleScanHandlers();
-    initTimelineScanHandlers();
+    if (!scanHandlersInitialized) {
+      initSingleScanHandlers();
+      initTimelineScanHandlers();
+      scanHandlersInitialized = true;
+    }
   }
 
   function switchScanMode(mode) {
@@ -1351,6 +1370,12 @@
       `;
     }).join('');
 
+    const detailedNotes = summary.detailed_report || summary.notes || summary.explanation || 'Sequential comparative leaf evaluation completed.';
+    const formattedNotesHtml = escapeHtml(detailedNotes)
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n\n/g, '<br><br>')
+      .replace(/\n/g, '<br>');
+
     dom.timelineResultsCard.innerHTML = `
       <div class="res-hero">
         <div>
@@ -1366,17 +1391,41 @@
         ${itemsHtml}
       </div>
 
-      <div style="background: var(--surface-subtle); padding: 1.25rem; border-radius: var(--radius-lg); border: 1.5px solid var(--border); margin: 1.25rem 0;">
-        <h4 style="font-size: 0.95rem; color: var(--emerald-900); margin-bottom: 0.5rem;">Agronomic Trajectory Assessment</h4>
-        <p style="font-size: 0.85rem; color: var(--text-2); line-height: 1.5;">${escapeHtml(summary.notes || 'Sequential comparative leaf evaluation completed.')}</p>
+      <div style="background: var(--surface-subtle); padding: 1.5rem; border-radius: var(--radius-lg); border: 1.5px solid var(--border); margin: 1.25rem 0;">
+        <h4 style="font-size: 1.02rem; color: var(--emerald-900); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+          📊 Agronomic Trajectory & Pathology Assessment
+        </h4>
+        <div style="font-size: 0.88rem; color: var(--text-2); line-height: 1.65;">
+          ${formattedNotesHtml}
+        </div>
       </div>
 
       <div class="res-actions-strip">
-        <button class="btn btn-secondary" onclick="window.agroOpenAgroBot('Can you analyze my plant timeline progression results and recommend recovery protocols?')">
+        <button class="btn btn-secondary" id="btn-discuss-trajectory-action" type="button">
           💬 Discuss Trajectory with AgroBot
         </button>
       </div>
     `;
+
+    const discussBtn = dom.timelineResultsCard.querySelector('#btn-discuss-trajectory-action');
+    if (discussBtn) {
+      discussBtn.addEventListener('click', () => {
+        const cropName = (items[0]?.result?.plant || selectedCrop || 'Crop');
+        const trajCtx = {
+          is_trajectory: true,
+          crop: cropName,
+          initial_prediction: summary.initial_prediction || items[0]?.result?.prediction,
+          latest_prediction: summary.latest_prediction || items[items.length - 1]?.result?.prediction,
+          total_days: summary.total_days || 5,
+          delta_pct: Math.round((summary.delta || 0) * 100),
+          trajectory: summary.trajectory || summary.trend || 'STABLE',
+          detailed_report: summary.detailed_report || summary.explanation || '',
+          weather: data.weather || {}
+        };
+        const promptText = `Can you analyze my ${cropName} timeline progression results (${trajCtx.trajectory}, ${trajCtx.total_days} days) and recommend recovery protocols?`;
+        openAgroBot(promptText, trajCtx);
+      });
+    }
 
     dom.timelineResultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -1914,17 +1963,29 @@
 
     const context = {};
     if (state.activeScanResult) {
-      context.prediction = state.activeScanResult.prediction;
-      context.plant_name = state.activeScanResult.plant;
-      context.confidence_pct = state.activeScanResult.confidence_pct;
-      if (state.activeScanResult.gradcam) {
-        context.affected_pct = state.activeScanResult.gradcam.affected_pct;
-        context.gradcam = {
-          affected_pct: state.activeScanResult.gradcam.affected_pct,
-          category: state.activeScanResult.gradcam.category
-        };
+      if (state.activeScanResult.is_trajectory) {
+        context.is_trajectory = true;
+        context.crop = state.activeScanResult.crop;
+        context.initial_prediction = state.activeScanResult.initial_prediction;
+        context.latest_prediction = state.activeScanResult.latest_prediction;
+        context.total_days = state.activeScanResult.total_days;
+        context.delta_pct = state.activeScanResult.delta_pct;
+        context.trajectory = state.activeScanResult.trajectory;
+        context.detailed_report = state.activeScanResult.detailed_report;
+        context.weather = state.activeScanResult.weather || {};
+      } else {
+        context.prediction = state.activeScanResult.prediction;
+        context.plant_name = state.activeScanResult.plant;
+        context.confidence_pct = state.activeScanResult.confidence_pct;
+        if (state.activeScanResult.gradcam) {
+          context.affected_pct = state.activeScanResult.gradcam.affected_pct;
+          context.gradcam = {
+            affected_pct: state.activeScanResult.gradcam.affected_pct,
+            category: state.activeScanResult.gradcam.category
+          };
+        }
+        context.weather = state.activeScanResult.weather || {};
       }
-      context.weather = state.activeScanResult.weather || {};
     }
 
     const payload = {
@@ -2184,6 +2245,7 @@
             state.user = data.user;
             localStorage.setItem('agro_user', JSON.stringify(data.user));
             updateUserUI();
+            clearChatbotState();
             showToast(`Welcome back, ${data.user.username}!`);
             closeModal(dom.modalUserAccount);
             loadUserJournal();
@@ -2211,6 +2273,7 @@
             state.user = data.user;
             localStorage.setItem('agro_user', JSON.stringify(data.user));
             updateUserUI();
+            clearChatbotState();
             showToast(`Account created! Welcome, ${data.user.username}.`);
             closeModal(dom.modalUserAccount);
             loadUserJournal();
